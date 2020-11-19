@@ -71,38 +71,20 @@ __global__ void my_convolution_kernel(float *output, float *input, float *weight
 						int input_index = n_idx * C * H * W + c_idx * H * W + h_idx * W + w_idx;
 						int weight_index = k_idx * C * kH * kW + c_idx * kH * kW + kh_idx * kW + kw_idx;
 						sum += input[input_index] * weight[weight_index];
-
-						//if (tid == 74 || tid == 154 || tid == 280 || tid == 654 || tid == 905 || tid == 1229 || tid == 1575 || tid == 1805 || tid == 2386)
-						//{
-						//	printf("index: %d, input : %f, weight : %f, the sum of CUDA : %f\n", tid, input[input_index], weight[weight_index], sum);
-						//}
-
 					}
 				}
 			}
 		}
 	}
-	//if (tid == 74 || tid == 154 || tid == 280 || tid == 654 || tid == 905 || tid == 1229 || tid == 1575 || tid == 1805 || tid == 2386)
-	//{
-	//	printf("index: %d, the sum of CUDA : %f\n", tid, sum);
-	//}
 	sum += bias[k_idx];
 	output[tid] = sum;
 
-	//if (tid == 74 || tid == 154 || tid == 280|| tid == 654 || tid == 905 || tid == 1229 || tid == 1575 || tid == 1805 || tid == 2386) 
-	//{ printf("index: %d, the sum of CUDA : %f\n", tid, sum); }
-	
-
-	//if (tid < 5 * 24 * 24) {
-	//	printf("%dth thread : %f\n", tid, output[tid]);
-	//}
 }
 
 void my_convolution_func(float* output, float* input, float *weight, float *bias,
 	int batch, int out_channel, Dims dim_input, Dims dim_kernel,
 	Dims dim_pad, Dims dim_stride, cudaStream_t stream)
 {
-
 
 	int N = batch;
 	int C = dim_input.d[0];
@@ -115,14 +97,6 @@ void my_convolution_func(float* output, float* input, float *weight, float *bias
 	int pW = dim_pad.d[1];
 	int sH = dim_stride.d[0];
 	int sW = dim_stride.d[1];
-
-	//for (int i = 0; i < K * C * kH * kW; ++i) {
-	//	printf("%f\n", weight[i]);
-	//}
-
-	//for (int i = 0; i < K; ++i) {
-	//	printf("%f\n", bias[i]);
-	//}
 
 	int P = ((H + 2 * pH - kH) / sH) + 1;
 	int Q = ((W + 2 * pW - kW) / sW) + 1;
@@ -147,9 +121,5 @@ void my_convolution_func(float* output, float* input, float *weight, float *bias
 	my_convolution_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
 		N, C, K, H, W,
 		kH, kW, pH, pW, sH, sW, TOTAL_SIZE, stream);
-
-	//my_convolution_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK, 0, stream >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
-	//	N, C, K, H, W,
-	//	kH, kW, pH, pW, sH, sW, TOTAL_SIZE, stream);
 
 }
