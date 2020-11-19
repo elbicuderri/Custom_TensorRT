@@ -142,11 +142,6 @@ public:
 
 	int enqueue(int batchSize, const void* const* inputs, void** outputs, void* workspace, cudaStream_t stream) override // inputs and outputs on GPU
 	{
-		//float* d_inputs;
-		//cudaMalloc((void**)&d_inputs, N * C * H * W * sizeof(float));
-		//cudaMemcpyAsync((void*)d_inputs, inputs[0], N * C * H * W * sizeof(float), cudaMemcpyDeviceToDevice, stream);
-		//cudaMemcpy((void*)d_inputs, inputs[0], N * C * H * W * sizeof(float), cudaMemcpyDeviceToDevice);
-
 		float* d_WEIGHT;
 		cudaMalloc((void**)&d_WEIGHT, K * C * kH * kW * sizeof(float));
 		cudaMemcpyAsync((void*)d_WEIGHT, (const void*)WEIGHT, K * C * kH * kW * sizeof(float), cudaMemcpyHostToDevice, stream);
@@ -157,24 +152,12 @@ public:
 		cudaMemcpyAsync((void*)d_BIAS, (const void*)BIAS, K * sizeof(float), cudaMemcpyHostToDevice, stream);
 		//cudaMemcpy(d_BIAS, (const void*)BIAS, sizeof(BIAS), cudaMemcpyHostToDevice);
 
-		float* d_outputs;
-		cudaMalloc((void**)&d_outputs, N * K * P * Q * sizeof(float));
-
 		std::cout << "Device Data Ready" << std::endl;
 
-		my_convolution_func((float*)d_outputs, (float*)inputs[0],
+		my_convolution_func((float*)outputs[0], (float*)inputs[0],
 			(float*)d_WEIGHT, (float*)d_BIAS, N, K, d_input, d_kernel, d_pad, d_stride, stream);
 
-		//my_convolution_func((float*)d_outputs, (float*)d_inputs,
-		//	(float*)d_WEIGHT, (float*)d_BIAS, N, K, d_input, d_kernel, d_pad, d_stride, stream);
-
 		std::cout << "CUDA kernel completed" << std::endl;
-
-		cudaMemcpyAsync(outputs[0], (const void*)d_outputs, N * K * P * Q * sizeof(float),
-			cudaMemcpyDeviceToDevice, stream);
-
-		//cudaMemcpy(outputs[0], (const void*)d_outputs, N * K * P * Q * sizeof(float),
-			//cudaMemcpyDeviceToDevice);
 
 		return 0;
 	}
@@ -195,8 +178,6 @@ public:
 	int pW{ 0 };
 	int sH{ 1 };
 	int sW{ 1 };
-	//float* H_input;
-	//float* H_output;
 	float* WEIGHT;
 	float* BIAS;
 	int P;
@@ -243,14 +224,118 @@ bool load_data_int(int* output, const char* name, int size)
 	return true;
 }
 
+class MyInt8Calibrator : public nvinfer1::IInt8EntropyCalibrator2
+{
+public:
+	const int m_Total;
+	const int m_Batch;
+	const int m_InputC;
+	const int m_InputH;
+	const int m_InputW;
+	const int m_TotalSize;
+	const int m_BatchSize;
+	const std::string m_InputBlobName;
+	const std::string m_CalibTableFilePath;
+	int m_ImageIndex;
+	bool m_ReadCache;
+	void* m_DeviceInput{ nullptr };
+	std::vector<char> m_CalibrationCache;
+	float* m_Data{ nullptr };
+
+	MyInt8Calibrator(const int& Total, const int& Batch, const int& InputC, const int& InputH, const int& InputW,
+		const std::string& InputBlobName, const std::string& CalibTableFilePath,
+		float* Data, bool ReadCache = true) :
+		m_Total(Total),
+		m_Batch(Batch),
+		m_InputC(InputC),
+		m_InputH(InputH),
+		m_InputW(InputW),
+		m_TotalSize(Total * InputC * InputH * InputW),
+		m_BatchSize(Batch * InputC * InputH * InputW),
+		m_InputBlobName(InputBlobName.c_str()),
+		m_CalibTableFilePath(CalibTableFilePath.c_str()),
+		m_ImageIndex{ 0 },
+		m_Data(Data),
+		m_ReadCache(ReadCache)
+	{
+		cudaMalloc((void**)&m_DeviceInput, m_BatchSize * sizeof(float));
+	}
+
+	virtual ~MyInt8Calibrator() { cudaFree(m_DeviceInput); }
+
+	int getBatchSize() const override { return m_Batch; }
+
+	bool getBatch(void* bindings[], const char* names[], int nbBindings) override
+	{
+		std::cout << m_ImageIndex << std::endl;
+
+		float* BatchData = (float*)malloc(m_BatchSize * sizeof(float));
+
+		for (int i = 0; i < m_BatchSize; i++) {
+			int index = m_BatchSize * m_ImageIndex + i;
+			if (index >= m_TotalSize) { std::cout << "calibration finished" << std::endl; return false; }
+			else {
+				BatchData[i] = m_Data[index];
+			}
+		}
+
+		m_ImageIndex += m_Batch;
+
+		cudaMemcpy(m_DeviceInput, (const void*)BatchData, m_BatchSize * sizeof(float), cudaMemcpyHostToDevice);
+
+		assert(!strcmp(names[0], m_InputBlobName.c_str()));
+		bindings[0] = m_DeviceInput;
+
+		std::free(BatchData);
+
+		return true;
+	}
+
+	const void* readCalibrationCache(size_t& length) override
+	{
+		void* output{ nullptr };
+		m_CalibrationCache.clear();
+		assert(!m_CalibTableFilePath.empty());
+		std::ifstream input(m_CalibTableFilePath, std::ios::binary | std::ios::in);
+		input >> std::noskipws;
+		if (m_ReadCache && input.good())
+			std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+				std::back_inserter(m_CalibrationCache));
+
+		length = m_CalibrationCache.size();
+		if (length)
+		{
+			std::cout << "Using cached calibration table to build the engine" << std::endl;
+			output = &m_CalibrationCache[0];
+		}
+
+		else
+		{
+			std::cout << "New calibration table will be created to build the engine" << std::endl;
+			output = nullptr;
+		}
+
+		return output;
+	}
+
+	void writeCalibrationCache(const void* cache, size_t length) override
+	{
+		assert(!m_CalibTableFilePath.empty());
+		std::ofstream output(m_CalibTableFilePath, std::ios::binary);
+		output.write(reinterpret_cast<const char*>(cache), length);
+		std::cout << "Write New calibration table" << std::endl;
+	}
+
+};
+
 int main()
 {
 	clock_t start = clock();
 
 	int status{ 0 };
 
-	const int Total = 10;
-	const int BatchSize = 10;
+	const int Total = 10000;
+	const int BatchSize = 10000;
 	const int InputC = 1;
 	const int InputH = 28;
 	const int InputW = 28;
@@ -278,7 +363,9 @@ int main()
 	//// Build engine
 	builder->setMaxBatchSize(BatchSize);
 	config->setMaxWorkspaceSize(1_GiB);
-	config->setFlag(BuilderFlag::kDEBUG);
+	config->setFlag(BuilderFlag::kDEBUG);	
+	config->setAvgTimingIterations(1);
+	config->setMinTimingIterations(1);
 	//config->setFlag(BuilderFlag::kGPU_FALLBACK);
 	//builder->createNetworkV2(1U << static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_PRECISION));
 
@@ -334,21 +421,11 @@ int main()
 	std::cout << data->isNetworkOutput() << std::endl;
 
 	std::cout << "=====================================================" << std::endl;
-	//// Create scale layer with default power/shift and specified scale parameter.
-	//const float scaleParam = 1.0f;
-	//const Weights power{ DataType::kFLOAT, nullptr, 0 };
-	//const Weights shift{ DataType::kFLOAT, nullptr, 0 };
-	//const Weights scale{ DataType::kFLOAT, &scaleParam, 1 };
-	//IScaleLayer* scale_1 = network->addScale(*data, ScaleMode::kUNIFORM, shift, scale, power);
-	//assert(scale_1);
-	//scale_1->getOutput(0)->setName("scale1");
 
 	// Plugin convolution layer
 	IPlugin* my_conv = new my_convolution((float*)data, 1 * 28 * 28 * sizeof(float),
 		BatchSize, 5, (float*)conv1filter.values, (float*)conv1bias.values,
 		Dims{ 3, {1, 28, 28} }, Dims{ 2, {5, 5} }, Dims{ 2, {0, 0} }, Dims{ 2, {1, 1} });
-
-	//std::cout << "Iplugin made." << std::endl;
 
 	IPluginLayer *conv_plugin = network->addPlugin(&data, 1, *my_conv);
 
@@ -411,7 +488,6 @@ int main()
 	network->markOutput(*prob->getOutput(0));
 
 	////Loda the data
-
 	float* h_data = (float*)malloc(Total * InputH * InputW * sizeof(float));
 
 	if (!load_data(h_data, "data/mnist_test_images_float32.bin", Total * InputH * InputW))
@@ -425,6 +501,18 @@ int main()
 	}
 
 	std::cout << "Test Data Ready" << std::endl;
+
+	//////===================================================================================================
+	//INT8
+	//config->setFlag(BuilderFlag::kINT8);
+
+	//const int calibration_number = 1000;
+
+	//const std::string CalibrationFile = "CalibrationTableSample";
+
+	//MyInt8Calibrator calibrator(Total, BatchSize, InputC, InputH, InputW, InputName, CalibrationFile, h_data);
+
+	//config->setInt8Calibrator(&calibrator);
 
 	//////===================================================================================================
 
@@ -464,6 +552,8 @@ int main()
 
 	float* h_output = (float*)malloc(BatchSize * OutputSize * sizeof(float));
 
+	//std::unique_ptr<float> h_output = (float*)malloc(BatchSize * OutputSize * sizeof(float));
+
 	//float* h_output = (float*)malloc(BatchSize * 5 * 24 * 24 * sizeof(float));
 
 	cudaStream_t stream;
@@ -487,13 +577,13 @@ int main()
 		return status;
 	}
 
-	//cudaMemcpyAsync(h_output, Buffers[m_OutputBindingIndex],
-	//	BatchSize * 5 * 24 * 24 * sizeof(float),
-	//	cudaMemcpyDeviceToHost, stream);
-
-	cudaMemcpy(h_output, Buffers.at(m_OutputBindingIndex),
+	cudaMemcpyAsync(h_output, Buffers[m_OutputBindingIndex],
 		BatchSize * OutputSize * sizeof(float),
-		cudaMemcpyDeviceToHost);
+		cudaMemcpyDeviceToHost, stream);
+
+	//cudaMemcpy(h_output, Buffers.at(m_OutputBindingIndex),
+	//	BatchSize * OutputSize * sizeof(float),
+	//	cudaMemcpyDeviceToHost);
 
 	std::cout << "DeviceToHost" << std::endl;
 
@@ -504,13 +594,33 @@ int main()
 
 	//// layer confirm
 	//original answer
-	float* origin = (float*)malloc(BatchSize * OutputSize * sizeof(float));
-	if (!load_data(origin, "value/result_torch_float32.bin", BatchSize * OutputSize)) { status = -1; return status; }
+	//float* origin = (float*)malloc(BatchSize * OutputSize * sizeof(float));
+	//if (!load_data(origin, "value/result_torch_float32.bin", BatchSize * OutputSize)) { status = -1; return status; }
 
-	// compare
-	for (int i = 0; i < BatchSize * OutputSize; ++i) {
-		printf("Index: %d, PyTorch: %f,  TensorRT: %f\n", i, origin[i], h_output[i]);
+	//// compare
+	//for (int i = 0; i < BatchSize * OutputSize; ++i) {
+	//	printf("Index: %d, PyTorch: %f,  TensorRT: %f\n", i, origin[i], h_output[i]);
+	//}
+
+	int* label = (int*)malloc(Total * sizeof(int));
+
+	if (!(load_data_int(label, "data/mnist_test_labels_int32.bin", Total))) { status = -1; return status; }
+
+	int count = 0;
+	for (int i = 0; i < Total; i++) {
+		int answer = label[i];
+		int MyAnswer;
+		float max = -0.01f;
+		for (int j = 0; j < OutputSize; j++)
+		{
+			int index = OutputSize * i + j;
+			if (h_output[index] > max) { max = h_output[index]; MyAnswer = j; }
+		}
+		if (MyAnswer == answer) { count += 1;}
 	}
+
+	std::cout << "The number of correct is " << count << std::endl;
+	std::cout << ((float)count / (float)(Total)) * 100.0f << "%" << std::endl;
 
 	////========================================================================================================================
 
