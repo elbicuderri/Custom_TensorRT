@@ -105,21 +105,21 @@ void my_convolution_func(float* output, float* input, float *weight, float *bias
 	int TOTAL_SIZE = N * K * P * Q;
 	int NUMBER_OF_BLOCKS = (TOTAL_SIZE + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-	std::cout << "N of d_inputs is " << N << std::endl;
-	std::cout << "C of d_inputs is " << C << std::endl;
-	std::cout << "H of d_inputs is " << H << std::endl;
-	std::cout << "W of d_inputs is " << W << std::endl;
+	//std::cout << "N of d_inputs is " << N << std::endl;
+	//std::cout << "C of d_inputs is " << C << std::endl;
+	//std::cout << "H of d_inputs is " << H << std::endl;
+	//std::cout << "W of d_inputs is " << W << std::endl;
 
-	std::cout << "K  is " << K << std::endl;
-	std::cout << "P  is " << Q << std::endl;
-	std::cout << "Q  is " << Q << std::endl;
+	//std::cout << "K  is " << K << std::endl;
+	//std::cout << "P  is " << Q << std::endl;
+	//std::cout << "Q  is " << Q << std::endl;
 
-	std::cout << "TOTAL_SIZE  is " << TOTAL_SIZE << std::endl;
-	std::cout << "THREADS_PER_BLOCK  is " << THREADS_PER_BLOCK << std::endl;
-	std::cout << "NUMBER_OF_BLOCKS  is " << NUMBER_OF_BLOCKS << std::endl;
+	//std::cout << "TOTAL_SIZE  is " << TOTAL_SIZE << std::endl;
+	//std::cout << "THREADS_PER_BLOCK  is " << THREADS_PER_BLOCK << std::endl;
+	//std::cout << "NUMBER_OF_BLOCKS  is " << NUMBER_OF_BLOCKS << std::endl;
 
-	my_convolution_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
+	my_convolution_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK, 0, stream >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
 		N, C, K, H, W,
 		kH, kW, pH, pW, sH, sW, TOTAL_SIZE, stream);
 
-}
+}s
