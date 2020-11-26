@@ -46,10 +46,6 @@
 #include <limits.h>
 #include <float.h>
 
-//void my_convolution_func(float* output, float* input, float *weight, float *bias,
-//	int batch, int out_channel, Dims dim_input, Dims dim_kernel,
-//	Dims dim_pad, Dims dim_stride, cudaStream_t stream);
-
 void maxpooling(float *output, float *input,
 	int batch, int channel, int height, int width,
 	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream);
@@ -98,24 +94,6 @@ public:
 		oW = ((iW - 2 * pW - kW) / sW) + 1;
 	}
 
-	PoolingPluginV2IO(DataType iType, int BatchSize, int ic, int ih, int iw,
-		int kh, int kw, int ph, int pw, int sh, int sw)
-		: iType(iType)
-		, N(BatchSize)
-		, iC(ic)
-		, iH(ih)
-		, iW(iw)
-		, kH(kh)
-		, kW(kw)
-		, pH(ph)
-		, pW(pw)
-		, sH(sh)
-		, sW(sw)
-	{
-		oH = ((iH - 2 * pH - kH) / sH) + 1;
-		oW = ((iW - 2 * pW - kW) / sW) + 1;
-	}
-
 	~PoolingPluginV2IO() override
 	{
 	}
@@ -140,13 +118,6 @@ public:
 
 		if (iType == DataType::kINT8) 
 		{
-			//__int8* h_input = (__int8*)malloc(iC * iH * iW * sizeof(__int8));
-			//cudaMemcpy((void*)h_input, (const void*)&inputs[0], iC * iH * iW * sizeof(__int8), cudaMemcpyHostToDevice);
-
-			//for (int i = 0; i < iC * iH * iW; ++i) {
-			//	std::cout <<(int)(h_input[i]) << std::endl;
-			//}
-
 			maxpooling_int8((__int8*)outputs[0], (__int8*)inputs[0],
 				N, iC, iH, iW, kH, kW, pH, pW, sH, sW, stream);
 		}
@@ -197,7 +168,7 @@ public:
 		assert(in && nbInput == 1);
 		assert(out && nbOutput == 1);
 		assert(in[0].type == out[0].type);
-		iType = in[0].type;
+		iType = in[0].type; // iType is changed when in[0].type is changed.
 		//assert(in[0].format == TensorFormat::kLINEAR && out[0].format == TensorFormat::kLINEAR);
 	}
 
@@ -349,8 +320,6 @@ public:
 
 		h_batchdata.clear();
 
-		//std::free(BatchData);
-
 		return true;
 	}
 
@@ -449,14 +418,14 @@ int main()
 
 	int status{ 0 };
 
-	int Total = 1000;
+	int Total = 10000;
 	int BatchSize = 1;
 	int InputC = 1;
 	int InputH = 28;
 	int InputW = 28;
 	int OutputSize = 10;
 
-	int calibration_number = 100;
+	int calibration_number = 500;
 
 	const char* InputName = "data";
 	const char* OutputName = "prob";
@@ -515,12 +484,12 @@ int main()
 		return status;
 	}
 
-	std::vector<float> conv1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/conv1filter_torch_float32.wts");
-	std::vector<float> conv1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/conv1bias_torch_float32.wts");
-	std::vector<float> ip1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/ip1filter_torch_float32.wts");
-	std::vector<float> ip1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/ip1bias_torch_float32.wts");
-	std::vector<float> ip2filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/ip2filter_torch_float32.wts");
-	std::vector<float> ip2biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights/ip2bias_torch_float32.wts");
+	std::vector<float> conv1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\conv1filter_torch_float32.wts");
+	std::vector<float> conv1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\conv1bias_torch_float32.wts");
+	std::vector<float> ip1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip1filter_torch_float32.wts");
+	std::vector<float> ip1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip1bias_torch_float32.wts");
+	std::vector<float> ip2filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip2filter_torch_float32.wts");
+	std::vector<float> ip2biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip2bias_torch_float32.wts");
 
 	Weights conv1filter{ DataType::kFLOAT,  (const void*)&conv1filterData[0], (int64_t)125 };
 	Weights conv1bias{ DataType::kFLOAT,  (const void*)&conv1biasData[0], (int64_t)5 };
@@ -665,11 +634,11 @@ int main()
 	relu1->setPrecision(DataType::kINT8);
 	relu1->setOutputType(0, DataType::kINT8);
 
-	//ip2->setPrecision(DataType::kINT8);
-	//ip2->setOutputType(0, DataType::kINT8);
+	////ip2->setPrecision(DataType::kINT8);
+	////ip2->setOutputType(0, DataType::kINT8);
 
-	//prob->setPrecision(DataType::kINT8);
-	//prob->setOutputType(0, DataType::kINT8);
+	////prob->setPrecision(DataType::kINT8);
+	////prob->setOutputType(0, DataType::kINT8);
 	//////===================================================================================================
 
 	nvinfer1::ICudaEngine* mEngine = builder->buildEngineWithConfig(*network, *config);
@@ -708,8 +677,6 @@ int main()
 
 	for (int epoch = 0; epoch < epochs; ++epoch)
 	{
-
-		//std::cout << epoch + 1 << "th image " << std::endl;
 
 		std::vector<float> h_batchdata;
 
