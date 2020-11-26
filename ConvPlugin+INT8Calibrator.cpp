@@ -70,7 +70,6 @@ public:
 	std::vector<float> h_bias;
 	const char* mPluginNamespace;
 	std::string mNamespace;
-	//const int NUM_COORDCONV_CHANNELS = 2;
 
 public:
 	ConvPluginV2() {}
@@ -127,42 +126,6 @@ public:
 	{
 	}
 
-	//ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-	//	int oC, int oH, int oW, int kH, int kW, float* Weight, float* Bias)
-	//	: iType(iType)
-	//	, N(BatchSize)
-	//	, iC(iC)
-	//	, iH(iH)
-	//	, iW(iW)
-	//	, oC(oC)
-	//	, oH(oH)
-	//	, oW(oW)
-	//	, kH(kH)
-	//	, kW(kW)
-	//{
-	//	h_Weight = (float*)malloc(oC * iC * kH * kW * sizeof(float));
-	//	h_Bias = (float*)malloc(oC * sizeof(float));
-	//	h_Weight = Weight;
-	//	h_Bias = Bias;
-	//}
-
-	//ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-	//	int oC, int oH, int oW, int kH, int kW, std::vector<float>& Weight, std::vector<float>& Bias)
-	//	: iType(iType)
-	//	, N(BatchSize)
-	//	, iC(iC)
-	//	, iH(iH)
-	//	, iW(iW)
-	//	, oC(oC)
-	//	, oH(oH)
-	//	, oW(oW)
-	//	, kH(kH)
-	//	, kW(kW)
-	//	, h_Weight((float*)&Weight[0])
-	//	, h_Bias((float*)&Bias[0])
-	//{
-	//}
-
 	~ConvPluginV2() override
 	{
 	}
@@ -176,14 +139,6 @@ public:
 	Dims getOutputDimensions(int index,
 		const Dims* inputs, int npInputDims) override
 	{
-		//Dims dimsOutput;
-		//dimsOutput.nbDims = inputs->nbDims;
-		//dimsOutput.d[0] = inputs->d[0]
-		//dimsOutput.d[1] = inputs->d[1];
-		//dimsOutput.d[2] = inputs->d[2];
-		//dimsOutput.d[3] = inputs->d[3];
-		//return dimsOutput;
-
 		return Dims{ 3, {oC, oH, oW} };
 	}
 
@@ -196,16 +151,10 @@ public:
 		cudaMalloc((void**)&d_Weight, oC * iC * kH * kW * sizeof(float));
 		cudaMemcpyAsync((void*)d_Weight, (const void*)h_Weight,
 			oC * iC * kH * kW * sizeof(float), cudaMemcpyHostToDevice, stream);
-		//cudaMemcpyAsync((void*)d_Weight, (const void*)h_Weight,
-		//	oC * iC * kH * kW * sizeof(float), cudaMemcpyHostToDevice, stream);
-		//cudaMemcpy((void*)d_Weight, (const void*)WEIGHT, K * C * kH * kW * sizeof(float), cudaMemcpyHostToDevice);
 
 		float* d_Bias;
 		cudaMalloc((void**)&d_Bias, oC * sizeof(float));
 		cudaMemcpyAsync((void*)d_Bias, (const void*)h_Bias, oC * sizeof(float), cudaMemcpyHostToDevice, stream);
-		//cudaMemcpy(d_Bias, (const void*)BIAS, sizeof(BIAS), cudaMemcpyHostToDevice);
-
-		//std::cout << "Device Data Ready" << std::endl;
 
 		my_convolution_func((float*)outputs[0], (float*)inputs[0],
 			(float*)d_Weight, (float*)d_Bias, N, oC,
@@ -412,17 +361,6 @@ public:
 
 	bool getBatch(void* bindings[], const char* names[], int nbBindings) override
 	{
-		std::cout << m_ImageIndex << std::endl;
-
-		//float* BatchData = (float*)malloc(m_BatchSize * sizeof(float));
-
-		//for (int i = 0; i < m_BatchSize; i++) {
-		//	int index = m_BatchSize * m_ImageIndex + i;
-		//	if (index >= m_TotalSize) { std::cout << "calibration finished" << std::endl; return false; }
-		//	else {
-		//		BatchData[i] = m_data[index];
-		//	}
-		//}
 
 		for (int i = 0; i < m_BatchSize; i++) {
 			int index = m_BatchSize * m_ImageIndex + i;
@@ -434,16 +372,12 @@ public:
 
 		m_ImageIndex += m_Batch;
 
-		//cudaMemcpy(m_DeviceInput, (const void*)BatchData, m_BatchSize * sizeof(float), cudaMemcpyHostToDevice);
-
 		cudaMemcpy(m_DeviceInput, (const void*)&h_batchdata[0], m_BatchSize * sizeof(float), cudaMemcpyHostToDevice);
 
 		assert(!strcmp(names[0], m_InputBlobName.c_str()));
 		bindings[0] = m_DeviceInput;
 
 		h_batchdata.clear();
-
-		//std::free(BatchData);
 
 		return true;
 	}
@@ -485,35 +419,6 @@ public:
 
 };
 
-//template < typename T>
-//std::vector<T> load_data_vector(std::string name)
-//{
-//	
-//}
-
-//template<typename T>
-//std::vector<T> load_data_vector(std::string name)
-//{
-//	std::ifstream input(name, std::ios::in | std::ios::binary);
-//	if (!(input.is_open())) 
-//	{
-//		std::cout << "Cannot open the file!" << std::endl;
-//		exit(-1);
-//	}
-//	std::vector<T> data;
-//	input.seekg(0, std::ios::end);
-//	int size = input.tellg();
-//	input.seekg(0, std::ios::beg);
-//
-//	for (int i = 0; i < size / sizeof(T); ++i) {
-//		T value;
-//		input.read((char*)&value, sizeof(T));
-//		data.push_back(value);
-//	}
-//
-//	return data;
-//}
-
 template<typename T>
 std::vector<T> load_data_vector(std::string name)
 {
@@ -537,27 +442,6 @@ std::vector<T> load_data_vector(std::string name)
 
 	return data;
 }
-
-//template<typename T>
-//void load_data_vector(std::vector<T>& data, std::string name)
-//{
-//	std::ifstream input(name, std::ios::in | std::ios::binary);
-//	if (!(input.is_open()))
-//	{
-//		std::cout << "Cannot open the file!" << std::endl;
-//		exit(-1);
-//	}
-//
-//	input.seekg(0, std::ios::end);
-//	int size = input.tellg();
-//	input.seekg(0, std::ios::beg);
-//
-//	for (int i = 0; i < size / sizeof(T); ++i) {
-//		T value;
-//		input.read((char*)&value, sizeof(T));
-//		data.push_back(value);
-//	}
-//}
 
 template<typename T>
 void PrintVector(std::vector<T>& vector)
@@ -593,7 +477,7 @@ int main()
 
 	int status{ 0 };
 
-	int Total = 9000;
+	int Total = 10000;
 	int BatchSize = 1;
 	int InputC = 1;
 	int InputH = 28;
@@ -645,13 +529,10 @@ int main()
 
 	const std::string CalibrationFile = "CalibrationTableSample";
 
-	//MyInt8Calibrator calibrator(calibration_number, 1,
-	//	InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
-
-	MyInt8Calibrator* calibrator2 = new MyInt8Calibrator(calibration_number, 1,
+	MyInt8Calibrator* calibrator = new MyInt8Calibrator(calibration_number, 1,
 		InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
 
-	config->setInt8Calibrator(calibrator2);
+	config->setInt8Calibrator(calibrator);
 
 	//======================================================================================================
 
@@ -895,7 +776,6 @@ int main()
 	//		printf("PyTorch: %f, TensorRT: %f\n", origin[(n + calibration_number) * 10 + c], h_total_output[n][c]);
 	//	}
 	//}
-
 
 	auto label = load_data_vector<int>("data/mnist_test_labels_int32.bin");
 
