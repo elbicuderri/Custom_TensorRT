@@ -90,23 +90,11 @@ public:
 		, h_Weight((float*)Weight.values)
 		, h_Bias((float*)Bias.values)
 	{
-		//for (int i = 0; i < Weight.count; ++i) {
-		//	h_weight.push_back((float*)Weight[i]);
-		//}
-
-		//h_weight.insert(h_weight.begin(), std::begin(Weight.values), std::end(Weight.values));
-		//std::copy(Weight.values, Weight.values);
-		//h_Weight = (float*)Weight.values;
-		//h_Bias = (float*)Bias.values;
-		//h_Weight = (float*)malloc(oC * iC * kH * kW * sizeof(float));
-		//h_Bias = (float*)malloc(oC * sizeof(float));
-		//h_Weight = Weight;
-		//h_Bias = Bias;
 	}
 
-	ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-		int oC, int oH, int oW, int kH, int kW, float* Weight, float* Bias)
-		: iType(iType)
+	ConvPluginV2(ITensor* data, int BatchSize, int iC, int iH, int iW,
+		int oC, int oH, int oW, int kH, int kW, Weights Weight, Weights Bias)
+		: iType(data->getType())
 		, N(BatchSize)
 		, iC(iC)
 		, iH(iH)
@@ -116,31 +104,66 @@ public:
 		, oW(oW)
 		, kH(kH)
 		, kW(kW)
+		, h_Weight((float*)Weight.values)
+		, h_Bias((float*)Bias.values)
 	{
-		h_Weight = (float*)malloc(oC * iC * kH * kW * sizeof(float));
-		h_Bias = (float*)malloc(oC * sizeof(float));
-		h_Weight = Weight;
-		h_Bias = Bias;
 	}
 
-	ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-		int oC, int oH, int oW, int kH, int kW, std::vector<float>& Weight, std::vector<float>& Bias)
-		: iType(iType)
+	ConvPluginV2(ITensor* data, int BatchSize, int oC, int iC, int iH, int iW, 
+		int kH, int kW, int pH, int pW, int sH, int sW,
+		 Weights Weight, Weights Bias)
+		: iType(data->getType())
 		, N(BatchSize)
 		, iC(iC)
 		, iH(iH)
 		, iW(iW)
 		, oC(oC)
-		, oH(oH)
-		, oW(oW)
+		, oH(((iH - 2 * pH - kH) / sH) +1)
+		, oW(((iW - 2 * pW - kW) / sW) + 1)
 		, kH(kH)
 		, kW(kW)
-		, h_Weight((float*)&Weight[0])
-		, h_Bias((float*)&Bias[0])
+		, h_Weight((float*)Weight.values)
+		, h_Bias((float*)Bias.values)
 	{
 	}
 
-	~ConvPluginV2() override 
+	//ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
+	//	int oC, int oH, int oW, int kH, int kW, float* Weight, float* Bias)
+	//	: iType(iType)
+	//	, N(BatchSize)
+	//	, iC(iC)
+	//	, iH(iH)
+	//	, iW(iW)
+	//	, oC(oC)
+	//	, oH(oH)
+	//	, oW(oW)
+	//	, kH(kH)
+	//	, kW(kW)
+	//{
+	//	h_Weight = (float*)malloc(oC * iC * kH * kW * sizeof(float));
+	//	h_Bias = (float*)malloc(oC * sizeof(float));
+	//	h_Weight = Weight;
+	//	h_Bias = Bias;
+	//}
+
+	//ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
+	//	int oC, int oH, int oW, int kH, int kW, std::vector<float>& Weight, std::vector<float>& Bias)
+	//	: iType(iType)
+	//	, N(BatchSize)
+	//	, iC(iC)
+	//	, iH(iH)
+	//	, iW(iW)
+	//	, oC(oC)
+	//	, oH(oH)
+	//	, oW(oW)
+	//	, kH(kH)
+	//	, kW(kW)
+	//	, h_Weight((float*)&Weight[0])
+	//	, h_Bias((float*)&Bias[0])
+	//{
+	//}
+
+	~ConvPluginV2() override
 	{
 	}
 
@@ -182,7 +205,7 @@ public:
 		cudaMemcpyAsync((void*)d_Bias, (const void*)h_Bias, oC * sizeof(float), cudaMemcpyHostToDevice, stream);
 		//cudaMemcpy(d_Bias, (const void*)BIAS, sizeof(BIAS), cudaMemcpyHostToDevice);
 
-		std::cout << "Device Data Ready" << std::endl;
+		//std::cout << "Device Data Ready" << std::endl;
 
 		my_convolution_func((float*)outputs[0], (float*)inputs[0],
 			(float*)d_Weight, (float*)d_Bias, N, oC,
@@ -256,7 +279,7 @@ public:
 
 	IPluginV2Ext* clone() const override
 	{
-		auto* plugin = new ConvPluginV2(iType, N, iC, iH, iW, oC, oH, oW, kH, kW, h_Weight, h_Bias);
+		auto* plugin = new ConvPluginV2(*this);
 		return plugin;
 	}
 
@@ -359,6 +382,7 @@ public:
 		m_Data(Data),
 		m_ReadCache(ReadCache)
 	{
+		m_Data = Data;
 		cudaMalloc((void**)&m_DeviceInput, m_BatchSize * sizeof(float));
 	}
 
@@ -404,7 +428,7 @@ public:
 			int index = m_BatchSize * m_ImageIndex + i;
 			if (index >= m_TotalSize) { std::cout << "calibration finished" << std::endl; return false; }
 			else {
-				h_batchdata.push_back(m_data[index]);
+				h_batchdata.push_back(m_Data[index]);
 			}
 		}
 
@@ -491,7 +515,7 @@ public:
 //}
 
 template<typename T>
-void load_data_vector(std::vector<T>& data, std::string name)
+std::vector<T> load_data_vector(std::string name)
 {
 	std::ifstream input(name, std::ios::in | std::ios::binary);
 	if (!(input.is_open()))
@@ -499,7 +523,8 @@ void load_data_vector(std::vector<T>& data, std::string name)
 		std::cout << "Cannot open the file!" << std::endl;
 		exit(-1);
 	}
-	//std::vector<T> data;
+
+	std::vector<T> data;
 	input.seekg(0, std::ios::end);
 	int size = input.tellg();
 	input.seekg(0, std::ios::beg);
@@ -510,8 +535,29 @@ void load_data_vector(std::vector<T>& data, std::string name)
 		data.push_back(value);
 	}
 
-	//return data;
+	return data;
 }
+
+//template<typename T>
+//void load_data_vector(std::vector<T>& data, std::string name)
+//{
+//	std::ifstream input(name, std::ios::in | std::ios::binary);
+//	if (!(input.is_open()))
+//	{
+//		std::cout << "Cannot open the file!" << std::endl;
+//		exit(-1);
+//	}
+//
+//	input.seekg(0, std::ios::end);
+//	int size = input.tellg();
+//	input.seekg(0, std::ios::beg);
+//
+//	for (int i = 0; i < size / sizeof(T); ++i) {
+//		T value;
+//		input.read((char*)&value, sizeof(T));
+//		data.push_back(value);
+//	}
+//}
 
 template<typename T>
 void PrintVector(std::vector<T>& vector)
@@ -522,33 +568,46 @@ void PrintVector(std::vector<T>& vector)
 	}
 }
 
+void print_DataType(DataType datatype)
+{
+	switch (datatype)
+	{
+	case DataType::kFLOAT:
+		std::cout << "FLOAT" << std::endl;
+		break;
+	case DataType::kHALF:
+		std::cout << "HALF" << std::endl;
+		break;
+	case DataType::kINT8:
+		std::cout << "INT8" << std::endl;
+		break;
+	default:
+		std::cout << "Unknown" << std::endl;
+		break;
+	}
+}
+
 int main()
 {
-	//std::vector<float> data;
-	//load_data_vector(data, "weights/conv1filter_torch_float32.wts");
-
-	//float* a = &data[0];
-
-	//for (int i = 0; i < 125; ++i) {
-	//	std::cout << "data:[" << i << "]:  " << data[i] << std::endl;
-	//	std::cout << "a:[" << i << "]:  " << a[i] << "\n" << std::endl;
-	//}
-
-	//PrintVector(data);
-
 	clock_t start = clock();
 
 	int status{ 0 };
 
-	int Total = 10;
-	int BatchSize = 10;
+	int Total = 9000;
+	int BatchSize = 1;
 	int InputC = 1;
 	int InputH = 28;
 	int InputW = 28;
 	int OutputSize = 10;
 
+	int calibration_number = 1000;
+
 	const char* InputName = "data";
 	const char* OutputName = "prob";
+
+	std::vector<float> h_data = load_data_vector<float>("data/mnist_test_images_float32.bin");
+
+	std::cout << "Test Data Ready" << std::endl;
 
 	Logger gLogger{ Logger::Severity::kVERBOSE };
 
@@ -572,11 +631,29 @@ int main()
 	config->setFlag(BuilderFlag::kDEBUG);
 	config->setAvgTimingIterations(1);
 	config->setMinTimingIterations(1);
+	config->setFlag(BuilderFlag::kSTRICT_TYPES);
 	//config->setFlag(BuilderFlag::kGPU_FALLBACK);
 
 	//// FP16
 	//config->setFlag(BuilderFlag::kFP16);
-	//config->setFlag(BuilderFlag::kSTRICT_TYPES);
+
+	////INT8
+	config->setFlag(BuilderFlag::kINT8);
+
+	auto calib_data = std::vector<float>(h_data.begin(),
+		h_data.begin() + (calibration_number * InputH * InputW));
+
+	const std::string CalibrationFile = "CalibrationTableSample";
+
+	//MyInt8Calibrator calibrator(calibration_number, 1,
+	//	InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
+
+	MyInt8Calibrator* calibrator2 = new MyInt8Calibrator(calibration_number, 1,
+		InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
+
+	config->setInt8Calibrator(calibrator2);
+
+	//======================================================================================================
 
 	nvinfer1::INetworkDefinition* network = builder->createNetwork();
 	if (!network)
@@ -585,18 +662,12 @@ int main()
 		return status;
 	}
 
-	std::vector<float> conv1filterData;
-	load_data_vector(conv1filterData, "weights/conv1filter_torch_float32.wts");
-	std::vector<float> conv1biasData;
-	load_data_vector(conv1biasData, "weights/conv1bias_torch_float32.wts");
-	std::vector<float> ip1filterData;
-	load_data_vector(ip1filterData, "weights/ip1filter_torch_float32.wts");
-	std::vector<float> ip1biasData;
-	load_data_vector(ip1biasData, "weights/ip1bias_torch_float32.wts");
-	std::vector<float> ip2filterData;
-	load_data_vector(ip2filterData, "weights/ip2filter_torch_float32.wts");
-	std::vector<float> ip2biasData;
-	load_data_vector(ip2biasData, "weights/ip2bias_torch_float32.wts");
+	std::vector<float> conv1filterData = load_data_vector<float>("weights/conv1filter_torch_float32.wts");
+	std::vector<float> conv1biasData = load_data_vector<float>("weights/conv1bias_torch_float32.wts");
+	std::vector<float> ip1filterData = load_data_vector<float>("weights/ip1filter_torch_float32.wts");
+	std::vector<float> ip1biasData = load_data_vector<float>("weights/ip1bias_torch_float32.wts");
+	std::vector<float> ip2filterData = load_data_vector<float>("weights/ip2filter_torch_float32.wts");
+	std::vector<float> ip2biasData = load_data_vector<float>("weights/ip2bias_torch_float32.wts");
 
 	Weights conv1filter{ DataType::kFLOAT,  (const void*)&conv1filterData[0], (int64_t)125 };
 	Weights conv1bias{ DataType::kFLOAT,  (const void*)&conv1biasData[0], (int64_t)5 };
@@ -604,17 +675,6 @@ int main()
 	Weights ip1bias{ DataType::kFLOAT,  (const void*)&ip1biasData[0], (int64_t)120 };
 	Weights ip2filter{ DataType::kFLOAT,  (const void*)&ip2filterData[0], (int64_t)(10 * 120) };
 	Weights ip2bias{ DataType::kFLOAT,  (const void*)&ip2biasData[0], (int64_t)10 };
-
-	//const void* aa = (const void*)&conv1biasData[0];
-
-	//std::vector<float> c1;
-
-	//int n = sizeof(aa) / sizeof(float);
-
-	//for (int i = 0; i < n; ++i) {
-	//	std::cout << *( ( (float*)aa)++);
-	//}
-	//std::vector<float> c1(aa, aa+n);
 
 	//// Create input tensor of shape { 1, 1, 28, 28 }
 	ITensor* data = network->addInput(
@@ -631,44 +691,53 @@ int main()
 	std::cout << "=====================================================" << std::endl;
 
 	//// Create scale layer with default power/shift and specified scale parameter.
-	//const float scaleParam = 1.0f / 255.0f;
-	//const Weights power{ DataType::kFLOAT, nullptr, 0 };
-	//const Weights shift{ DataType::kFLOAT, nullptr, 0 };
-	//const Weights scale{ DataType::kFLOAT, &scaleParam, 1 };
-	//IScaleLayer* scale_1 = network->addScale(*data, ScaleMode::kUNIFORM, shift, scale, power);
-	//assert(scale_1);
-	//scale_1->getOutput(0)->setName("scale1");
+	const float scaleParam = 1.0f / 255.0f;
+	const Weights power{ DataType::kFLOAT, nullptr, 0 };
+	const Weights shift{ DataType::kFLOAT, nullptr, 0 };
+	const Weights scale{ DataType::kFLOAT, &scaleParam, 1 };
+	IScaleLayer* scale_1 = network->addScale(*data, ScaleMode::kUNIFORM, shift, scale, power);
+	assert(scale_1);
+	scale_1->getOutput(0)->setName("scale1");
+
+	//scale_1->setPrecision(DataType::kINT8);
+	//scale_1->setOutputType(0, DataType::kINT8);
 
 	//////===================================================================================================
-
-	//ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-	//	int oC, int oH, int oW, int kH, int kW, float* Weight, float* Bias)
-
+	//custom convolution layer
 	//IPluginV2Ext* my_conv2 = new ConvPluginV2(DataType::kFLOAT, BatchSize,
-	//	InputC, InputH, InputW, 5, 24, 24, 5, 5, conv1filterData, conv1biasData);
+	//	InputC, InputH, InputW, 5, 24, 24, 5, 5, conv1filter, conv1bias);
 
-	//IPluginV2Ext* my_conv2 = new ConvPluginV2(DataType::kFLOAT, BatchSize,
-	//	InputC, InputH, InputW, 5, 24, 24, 5, 5, (float*)conv1filter.values, (float*)conv1bias.values);
+	//ConvPluginV2(ITensor* data, int BatchSize, int oC, int iC, int iH, int iW,
+	//	int kH, int kW, int pH, int pW, int sH, int sW,
+	//	Weights Weight, Weights Bias)
 
-	IPluginV2Ext* my_conv2 = new ConvPluginV2(DataType::kFLOAT, BatchSize,
-		InputC, InputH, InputW, 5, 24, 24, 5, 5, conv1filter, conv1bias);
+	IPluginV2Ext* my_conv2 = new ConvPluginV2(scale_1->getOutput(0), BatchSize,
+		5, InputC, InputH, InputW, 5, 5, 0, 0, 1, 1, conv1filter, conv1bias);
 
-	ITensor* const b = data;
+	//IPluginV2Ext* my_conv2 = new ConvPluginV2(scale_1->getOutput(0), BatchSize,
+	//	InputC, InputH, InputW, 5, 24, 24, 5, 5, conv1filter, conv1bias);
 
-	IPluginV2Layer* ConvPluginV2Layer = network->addPluginV2(&b, 1, *my_conv2);
+	ITensor* const OutputOfScale = scale_1->getOutput(0);
 
+	IPluginV2Layer* conv_plugin = network->addPluginV2(&OutputOfScale, 1, *my_conv2);
 	std::cout << "IpluginLayer made." << std::endl;
-	//std::cout << (int)(ConvPluginV2Layer->getType()) << std::endl;
-	//ConvPluginV2Layer->getOutput(0)->setName("conv_plugin");
-	//std::cout << ConvPluginV2Layer->getName() << std::endl;
+	conv_plugin->getOutput(0)->setName("Conv_PluginV2");
 
-	//ConvPluginV2Layer->getOutput(0)->setName(OutputName);
-	//network->markOutput(*ConvPluginV2Layer->getOutput(0));
+	//conv_plugin->getOutput(0)->setName(OutputName);
+	//network->markOutput(*conv_plugin->getOutput(0));
+	//////===================================================================================================
+
+	//IConvolutionLayer* conv1 = network->addConvolutionNd(
+	//	*scale_1->getOutput(0), 5, Dims{ 2, {5, 5}, {} }, conv1filter, conv1bias);
+	//assert(conv1);
+	//conv1->setPadding(DimsHW{ 0, 0 });
+	//conv1->setStride(DimsHW{ 1, 1 });
+	//conv1->getOutput(0)->setName("conv1");
 
 	//////===================================================================================================
 
 	//////Add max pooling layer with stride of 2x2 and kernel size of 2x2.
-	IPoolingLayer* pool1 = network->addPoolingNd(*ConvPluginV2Layer->getOutput(0),
+	IPoolingLayer* pool1 = network->addPoolingNd(*conv_plugin->getOutput(0),
 		PoolingType::kMAX, Dims{ 2, {2, 2}, {} });
 	assert(pool1);
 	pool1->setStride(DimsHW{ 2, 2 });
@@ -700,51 +769,37 @@ int main()
 	//ip2->getOutput(0)->setName(OutputName);
 	//network->markOutput(*ip2->getOutput(0));
 
+	//print_DataType(ip2->getOutputType(0));
+
 	////Add softmax layer to determine the probability.
 	ISoftMaxLayer* prob = network->addSoftMax(*ip2->getOutput(0));
 	assert(prob);
+
 	prob->getOutput(0)->setName(OutputName);
 	network->markOutput(*prob->getOutput(0));
 
-	//////Loda the data
-	//float* h_data = (float*)malloc(Total * InputH * InputW * sizeof(float));
-
-	//if (!load_data(h_data, "data/mnist_test_images_float32.bin", Total * InputH * InputW))
-	//{
-	//	status = -1; return status;
-	//}
-
-	//for (int i = 0; i < Total * InputH * InputW; i++)
-	//{
-	//	h_data[i] /= 255.0f;
-	//}
-
-	std::vector<float> h_data;
-	load_data_vector(h_data, "data/mnist_test_images_float32.bin");
-
-	for (int i = 0; i < Total * InputH * InputW; i++)
-	{
-		h_data[i] /= 255.0f;
-	}
-	
-	std::cout << "Test Data Ready" << std::endl;
-
 	//////===================================================================================================
-	////INT8
-	config->setFlag(BuilderFlag::kINT8);
+	//set INT8 type
+	//conv_plugin->setOutputType(0, DataType::kINT8);
+	//conv_plugin->setPrecision(DataType::kINT8);
 
-	//const int calibration_number = 1000;
+	//conv1->setPrecision(DataType::kINT8);
+	//conv1->setOutputType(0, DataType::kINT8);
 
-	//float* calib_data = (float*)malloc(calibration_number * InputH * InputW * sizeof(float));
+	pool1->setPrecision(DataType::kINT8);
+	pool1->setOutputType(0, DataType::kINT8);
+	
+	ip1->setPrecision(DataType::kINT8);
+	ip1->setOutputType(0, DataType::kINT8);
 
-	const std::string CalibrationFile = "CalibrationTableSample";
+	relu1->setPrecision(DataType::kINT8);
+	relu1->setOutputType(0, DataType::kINT8);
 
-	//MyInt8Calibrator calibrator(Total, BatchSize, InputC, InputH, InputW, InputName, CalibrationFile, (float*)&h_data[0]);
+	ip2->setPrecision(DataType::kINT8);
+	ip2->setOutputType(0, DataType::kINT8);
 
-	MyInt8Calibrator calibrator(Total, 1, InputC, InputH, InputW, InputName, CalibrationFile, h_data);
-
-	config->setInt8Calibrator(&calibrator);
-
+	//prob->setPrecision(DataType::kINT8);
+	//prob->setOutputType(0, DataType::kINT8);
 	//////===================================================================================================
 
 	nvinfer1::ICudaEngine* mEngine = builder->buildEngineWithConfig(*network, *config);
@@ -771,106 +826,95 @@ int main()
 
 	////========================================================================================================================
 
-	std::vector<void*> Buffers;
+	int epochs = ((Total - calibration_number) + BatchSize - 1) / BatchSize;
 
-	Buffers.resize(mEngine->getNbBindings(), nullptr);
+	const int ResultSize = Total * OutputSize;
 
-	cudaMalloc((void**)&Buffers[m_InputBindingIndex], Total * InputH * InputW * sizeof(float));
+	const int BatchResultSize = BatchSize * OutputSize;
 
-	cudaMalloc((void**)&Buffers[m_OutputBindingIndex], Total * OutputSize * sizeof(float));
+	std::vector<std::vector<float>> h_total_output;
 
-	//cudaMalloc(&Buffers[m_OutputBindingIndex], BatchSize * 5 * 24 * 24 * sizeof(float));
-
-	//float* h_output = (float*)malloc(BatchSize * OutputSize * sizeof(float));
-
-	std::vector<float> h_output;
-
-	h_output.resize(BatchSize * OutputSize * sizeof(float));
-
-	//float* h_output = (float*)malloc(BatchSize * 5 * 24 * 24 * sizeof(float));
-
-	cudaStream_t stream;
-	cudaStreamCreate(&stream);
-
-	cudaMemcpyAsync(Buffers[m_InputBindingIndex], (const void*)&h_data[0],
-		Total * InputH * InputW * sizeof(float),
-		cudaMemcpyHostToDevice, stream);
-
-	//cudaMemcpy(Buffers.at(m_InputBindingIndex), h_data,
-	//	Total * InputH * InputW * sizeof(float),
-	//	cudaMemcpyHostToDevice);
-
-	std::cout << "HostToDevice" << std::endl;
-
-	bool stat = context->enqueue(Total, Buffers.data(), stream, nullptr);
-	if (!stat)
+	for (int epoch = 0; epoch < epochs; ++epoch)
 	{
-		std::cout << "context ERROR!" << std::endl;
-		status = -1;
-		return status;
+
+		//std::cout << epoch + 1 << "th image " << std::endl;
+
+		std::vector<float> h_batchdata;
+
+		auto start_index = h_data.begin() + ((epoch + calibration_number) * BatchSize * InputH * InputW);
+
+		auto end_index = h_data.begin() + ((epoch + calibration_number) * BatchSize * InputH * InputW + BatchSize * InputH * InputW);
+
+		h_batchdata = std::vector<float>(start_index, end_index);
+
+		std::vector<void*> Buffers;
+
+		Buffers.resize(mEngine->getNbBindings(), nullptr);
+
+		cudaMalloc((void**)&Buffers[m_InputBindingIndex], BatchSize * InputH * InputW * sizeof(float));
+
+		cudaMalloc((void**)&Buffers[m_OutputBindingIndex], BatchResultSize * sizeof(float));
+
+		std::vector<float> h_output(BatchResultSize);
+
+		cudaStream_t stream;
+		cudaStreamCreate(&stream);
+
+		cudaMemcpyAsync(Buffers[m_InputBindingIndex], (const void*)&h_batchdata[0],
+			BatchSize * InputH * InputW * sizeof(float),
+			cudaMemcpyHostToDevice, stream);
+
+		bool stat = context->enqueue(BatchSize, Buffers.data(), stream, nullptr);
+		if (!stat)
+		{
+			std::cout << "context ERROR!" << std::endl;
+			status = -1;
+			return status;
+		}
+
+		cudaMemcpyAsync((void*)&h_output[0], Buffers[m_OutputBindingIndex],
+			BatchResultSize * sizeof(float),
+			cudaMemcpyDeviceToHost, stream);
+
+		cudaStreamSynchronize(stream);
+		cudaStreamDestroy(stream);
+
+		h_total_output.push_back(h_output);
+
+		h_output.clear();
+
 	}
 
-	cudaMemcpyAsync((void*)&h_output[0], Buffers[m_OutputBindingIndex],
-		BatchSize * OutputSize * sizeof(float),
-		cudaMemcpyDeviceToHost, stream);
-
-	//cudaMemcpy(h_output, Buffers.at(m_OutputBindingIndex),
-	//	BatchSize * OutputSize * sizeof(float),
-	//	cudaMemcpyDeviceToHost);
-
-	//cudaMemcpyAsync(h_output, Buffers[m_OutputBindingIndex],
-	//	BatchSize * 5 * 24 * 24 * sizeof(float),
-	//	cudaMemcpyDeviceToHost, stream);
-
-	std::cout << "DeviceToHost" << std::endl;
-
-	cudaStreamSynchronize(stream);
-	cudaStreamDestroy(stream);
-
-	std::cout << "Stream Destroyed" << std::endl;
-
 	////========================================================================================================================
+	// layer confirm
+	//auto origin = load_data_vector<float>("value/dense2_torch_float32.bin");
 
-	//// layer confirm
-	//original answer
-	//float* origin = (float*)malloc(BatchSize * OutputSize * sizeof(float));
-	//if (!load_data(origin, "value/result_torch_float32.bin", BatchSize * OutputSize)) { status = -1; return status; }
-
-	//////conv2d
-	////float* origin = (float*)malloc(BatchSize * 5 * 24 * 24 * sizeof(float));
-	////if (!load_data(origin, "value/conv1_torch_float32.bin", BatchSize * 5 * 24 * 24)) { status = -1; return status; }
-
-	////// compare
-	//for (int i = 0; i < BatchSize * OutputSize; ++i) {
-	//	printf("Index: %d, PyTorch: %f,  TensorRT: %f\n", i, origin[i], h_output[i]);
+	//for (int n = 0; n < Total - calibration_number; ++n) {
+	//	std::cout << n + 1 << "th image: " << std::endl;
+	//	for (int c = 0; c < 10; ++c) {
+	//		printf("PyTorch: %f, TensorRT: %f\n", origin[(n + calibration_number) * 10 + c], h_total_output[n][c]);
+	//	}
 	//}
 
-	////========================================================================================================================
 
-	//int* label = (int*)malloc(Total * sizeof(int));
-
-	//if (!(load_data_int(label, "data/mnist_test_labels_int32.bin", Total))) { status = -1; return status; }
-
-	std::vector<int> label;
-	load_data_vector(label, "data/mnist_test_labels_int32.bin");
+	auto label = load_data_vector<int>("data/mnist_test_labels_int32.bin");
 
 	int count = 0;
-	for (int i = 0; i < Total; i++) {
-		int answer = label[i];
+	for (int i = 0; i < Total - calibration_number; i++) {
+		int answer = label[i + calibration_number];
 		int MyAnswer;
-		float max = -0.01f;
+		float max = -10.0f;
 		for (int j = 0; j < OutputSize; j++)
 		{
-			int index = OutputSize * i + j;
-			if (h_output[index] > max) { max = h_output[index]; MyAnswer = j; }
+			if (h_total_output[i][j] > max) { max = h_total_output[i][j]; MyAnswer = j; }
 		}
 		if (MyAnswer == answer) { count += 1; }
 	}
 
 	std::cout << "The number of correct is " << count << std::endl;
-	std::cout << ((float)count / (float)(Total)) * 100.0f << "%" << std::endl;
+	std::cout << ((float)count / (float)(Total - calibration_number)) * 100.0f << "%" << std::endl;
 
-	////========================================================================================================================
+	//////========================================================================================================================
 
 	std::cout << "Finished!\n" << std::endl;
 
