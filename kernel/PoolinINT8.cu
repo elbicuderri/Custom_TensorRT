@@ -15,7 +15,7 @@
 #include <cfloat>
 
 
-__global__ void maxpooling_kernel_int8(__int8* output, __int8* input,
+__global__ void maxpooling_kernel_int8(char* output, char* input,
 	int batch, int channel, int height, int width,
 	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, int total_size, cudaStream_t stream)
 {
@@ -53,7 +53,7 @@ __global__ void maxpooling_kernel_int8(__int8* output, __int8* input,
 
 		//output(n_idx, k_idx, p_idx, q_idx)
 
-		__int8 max = -128;
+		char max = -128;
 		for (int kh = 0; kh < kH; kh++) {
 			int h_idx = p_idx * sH + kh - pH;
 			if (h_idx >= 0 && h_idx < H) {
@@ -74,7 +74,7 @@ __global__ void maxpooling_kernel_int8(__int8* output, __int8* input,
 }
 
 
-void maxpooling_int8(__int8* output, __int8* input,
+void maxpooling_int8(char* output, char* input,
 	int batch, int channel, int height, int width,
 	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream)
 {
