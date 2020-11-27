@@ -470,10 +470,10 @@ int main()
 
 	const std::string CalibrationFile = "CalibrationTableSample";
 
-	MyInt8Calibrator calibrator(calibration_number, 1,
+	MyInt8Calibrator* calibrator = new MyInt8Calibrator(calibration_number, 1,
 		InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
 
-	config->setInt8Calibrator(&calibrator);
+	config->setInt8Calibrator(calibrator);
 
 	//======================================================================================================
 
