@@ -118,7 +118,7 @@ public:
 
 		if (iType == DataType::kINT8) 
 		{
-			maxpooling_int8((__int8*)outputs[0], (__int8*)inputs[0],
+			maxpooling_int8((char*)outputs[0], (char*)inputs[0],
 				N, iC, iH, iW, kH, kW, pH, pW, sH, sW, stream);
 		}
 
