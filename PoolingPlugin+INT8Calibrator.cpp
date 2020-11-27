@@ -50,7 +50,7 @@ void maxpooling(float *output, float *input,
 	int batch, int channel, int height, int width,
 	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream);
 
-void maxpooling_int8(__int8*output, __int8* input,
+void maxpooling_int8(__int8* output, __int8* input,
 	int batch, int channel, int height, int width,
 	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream);
 
