@@ -430,7 +430,7 @@ int main()
 	const char* InputName = "data";
 	const char* OutputName = "prob";
 
-	std::vector<float> h_data = load_data_vector<float>("C:\\Users\\muger\\Desktop\\data\\mnist_test_images_float32.bin");
+	std::vector<float> h_data = load_data_vector<float>("data/mnist_test_images_float32.bin");
 
 	std::cout << "Test Data Ready" << std::endl;
 
@@ -484,12 +484,12 @@ int main()
 		return status;
 	}
 
-	std::vector<float> conv1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\conv1filter_torch_float32.wts");
-	std::vector<float> conv1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\conv1bias_torch_float32.wts");
-	std::vector<float> ip1filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip1filter_torch_float32.wts");
-	std::vector<float> ip1biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip1bias_torch_float32.wts");
-	std::vector<float> ip2filterData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip2filter_torch_float32.wts");
-	std::vector<float> ip2biasData = load_data_vector<float>("C:\\Users\\muger\\Desktop\\weights\\ip2bias_torch_float32.wts");
+	std::vector<float> conv1filterData = load_data_vector<float>("weights/conv1filter_torch_float32.wts");
+	std::vector<float> conv1biasData = load_data_vector<float>("weights/conv1bias_torch_float32.wts");
+	std::vector<float> ip1filterData = load_data_vector<float>("weights/ip1filter_torch_float32.wts");
+	std::vector<float> ip1biasData = load_data_vector<float>("weights/ip1bias_torch_float32.wts");
+	std::vector<float> ip2filterData = load_data_vector<float>("weights/ip2filter_torch_float32.wts");
+	std::vector<float> ip2biasData = load_data_vector<float>("weights/ip2bias_torch_float32.wts");
 
 	Weights conv1filter{ DataType::kFLOAT,  (const void*)&conv1filterData[0], (int64_t)125 };
 	Weights conv1bias{ DataType::kFLOAT,  (const void*)&conv1biasData[0], (int64_t)5 };
@@ -742,7 +742,7 @@ int main()
 	//}
 
 
-	auto label = load_data_vector<int>("C:\\Users\\muger\\Desktop\\data\\mnist_test_labels_int32.bin");
+	auto label = load_data_vector<int>("data/mnist_test_labels_int32.bin");
 
 	int count = 0;
 	for (int i = 0; i < Total - calibration_number; i++) {
