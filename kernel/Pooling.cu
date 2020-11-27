@@ -52,8 +52,7 @@ __global__ void maxpooling_kernel(float *output, float *input,
 
 		//output(n_idx, k_idx, p_idx, q_idx)
 
-		float max = -(3.402823466e+38f);
-		//float max = -(3.40282E+38);
+		float max = -(3.402823466e+38F);
 		for (int kh = 0; kh < kH; kh++) {
 			int h_idx = p_idx * sH + kh - pH;
 			if (h_idx >= 0 && h_idx < H) {
