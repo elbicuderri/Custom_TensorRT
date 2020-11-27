@@ -64,8 +64,6 @@ public:
 	int iC, iH, iW;
 	int oC, oH, oW;
 	int kH, kW;
-	float* h_Weight;
-	float* h_Bias;
 	std::vector<float> h_weight;
 	std::vector<float> h_bias;
 	const char* mPluginNamespace;
@@ -73,40 +71,6 @@ public:
 
 public:
 	ConvPluginV2() {}
-
-	ConvPluginV2(DataType iType, int BatchSize, int iC, int iH, int iW,
-		int oC, int oH, int oW, int kH, int kW, Weights Weight, Weights Bias)
-		: iType(iType)
-		, N(BatchSize)
-		, iC(iC)
-		, iH(iH)
-		, iW(iW)
-		, oC(oC)
-		, oH(oH)
-		, oW(oW)
-		, kH(kH)
-		, kW(kW)
-		, h_Weight((float*)Weight.values)
-		, h_Bias((float*)Bias.values)
-	{
-	}
-
-	ConvPluginV2(ITensor* data, int BatchSize, int iC, int iH, int iW,
-		int oC, int oH, int oW, int kH, int kW, Weights Weight, Weights Bias)
-		: iType(data->getType())
-		, N(BatchSize)
-		, iC(iC)
-		, iH(iH)
-		, iW(iW)
-		, oC(oC)
-		, oH(oH)
-		, oW(oW)
-		, kH(kH)
-		, kW(kW)
-		, h_Weight((float*)Weight.values)
-		, h_Bias((float*)Bias.values)
-	{
-	}
 
 	ConvPluginV2(ITensor* data, int BatchSize, int oC, int iC, int iH, int iW, 
 		int kH, int kW, int pH, int pW, int sH, int sW,
@@ -121,9 +85,9 @@ public:
 		, oW(((iW - 2 * pW - kW) / sW) + 1)
 		, kH(kH)
 		, kW(kW)
-		, h_Weight((float*)Weight.values)
-		, h_Bias((float*)Bias.values)
 	{
+		h_weight.insert(h_weight.end(), &((float*)Weight.values)[0], &((float*)Weight.values)[oC*iC*kH*kW]);
+		h_bias.insert(h_bias.end(), &((float*)Bias.values)[0], &((float*)Bias.values)[oC]);
 	}
 
 	~ConvPluginV2() override
@@ -149,12 +113,12 @@ public:
 	{
 		float* d_Weight;
 		cudaMalloc((void**)&d_Weight, oC * iC * kH * kW * sizeof(float));
-		cudaMemcpyAsync((void*)d_Weight, (const void*)h_Weight,
+		cudaMemcpyAsync((void*)d_Weight, (const void*)&h_weight[0],
 			oC * iC * kH * kW * sizeof(float), cudaMemcpyHostToDevice, stream);
 
 		float* d_Bias;
 		cudaMalloc((void**)&d_Bias, oC * sizeof(float));
-		cudaMemcpyAsync((void*)d_Bias, (const void*)h_Bias, oC * sizeof(float), cudaMemcpyHostToDevice, stream);
+		cudaMemcpyAsync((void*)d_Bias, (const void*)&h_bias[0], oC * sizeof(float), cudaMemcpyHostToDevice, stream);
 
 		my_convolution_func((float*)outputs[0], (float*)inputs[0],
 			(float*)d_Weight, (float*)d_Bias, N, oC,
@@ -331,7 +295,6 @@ public:
 		m_Data(Data),
 		m_ReadCache(ReadCache)
 	{
-		m_Data = Data;
 		cudaMalloc((void**)&m_DeviceInput, m_BatchSize * sizeof(float));
 	}
 
@@ -791,6 +754,7 @@ int main()
 		if (MyAnswer == answer) { count += 1; }
 	}
 
+	std::cout << "The total number is " << Total - calibration_number << std::endl;
 	std::cout << "The number of correct is " << count << std::endl;
 	std::cout << ((float)count / (float)(Total - calibration_number)) * 100.0f << "%" << std::endl;
 
