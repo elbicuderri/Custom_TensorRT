@@ -169,6 +169,15 @@ public:
 		assert(out && nbOutput == 1);
 		assert(in[0].type == out[0].type);
 		iType = in[0].type; // iType is changed when in[0].type is changed.
+		if (iType == DataType::kINT8)
+		{
+			std::cout << "Pooling Type is INT8" << std::endl;
+		}
+
+		else
+		{
+			std::cout << "Pooling Type is FLOAT32" << std::endl;
+		}
 		//assert(in[0].format == TensorFormat::kLINEAR && out[0].format == TensorFormat::kLINEAR);
 	}
 
