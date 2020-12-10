@@ -481,6 +481,8 @@ int main()
 
 	MyInt8Calibrator* calibrator = new MyInt8Calibrator(calibration_number, 1,
 		InputC, InputH, InputW, InputName, CalibrationFile, (float*)&calib_data[0]);
+	
+	std::unique_ptr<MyInt8Calibrator> calibrator_(calibrator);
 
 	config->setInt8Calibrator(calibrator);
 
