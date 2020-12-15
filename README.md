@@ -12,3 +12,5 @@ This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlu
 - Softmax : (10,) -> (10,)
 
 Using TenosoRT API for constructing CNN network.
+
+## INT8 Calibrator, Plugin layer IMPLEMENTATION repo
