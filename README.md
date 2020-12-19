@@ -1,6 +1,6 @@
 # Custom_TensorRT
 
-## This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlugin)
+This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlugin)
 
 > MNIST
 >
@@ -11,6 +11,6 @@
 > FClayer2 : (120,) -> (10,)
 > Softmax : (10,) -> (10,)
 
-## Using TenosoRT API for constructing CNN network.
+Using TenosoRT API for constructing CNN network.
 
-## INT8 Calibrator, Plugin layer IMPLEMENTATION repo
+INT8 Calibrator, Plugin layer IMPLEMENTATION repo
