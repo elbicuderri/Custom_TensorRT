@@ -1,0 +1,231 @@
+class int8EntroyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
+    public:
+        int8EntroyCalibrator(const int &bacthSize,
+            const std::string &imgPath,
+            const std::string &calibTablePath);
+
+        virtual ~int8EntroyCalibrator();
+
+        int getBatchSize() const override { return batchSize; }
+
+        bool getBatch(void *bindings[], const char *names[], int nbBindings) override;
+
+        const void *readCalibrationCache(std::size_t &length) override;
+
+        void writeCalibrationCache(const void *ptr, std::size_t length) override;
+
+    private:
+
+        bool forwardFace;
+
+        int batchSize;
+        size_t inputCount;
+        size_t imageIndex;
+
+        std::string calibTablePath;
+        std::vector<std::string> imgPaths;
+
+        float *batchData{ nullptr };
+        void  *deviceInput{ nullptr };
+
+        bool readCache;
+        std::vector<char> calibrationCache;
+    };
+
+    int8EntroyCalibrator::int8EntroyCalibrator(const int &bacthSize, const std::string &imgPath,
+        const std::string &calibTablePath) :batchSize(bacthSize), calibTablePath(calibTablePath), imageIndex(0), forwardFace(
+            false) {
+        int inputChannel = 3;
+        int inputH = 2400;
+        int inputW = 2400;
+        inputCount = bacthSize*inputChannel*inputH*inputW;
+        std::fstream f(imgPath);
+        if (f.is_open()) {
+            std::string temp;
+            while (std::getline(f, temp)) imgPaths.push_back(temp);
+        }
+        int len = imgPaths.size();
+        for (int i = 0; i < len; i++) {
+            cout << imgPaths[i] << endl;
+        }
+        batchData = new float[inputCount];
+        CHECK(cudaMalloc(&deviceInput, inputCount * sizeof(float)));
+    }
+
+    int8EntroyCalibrator::~int8EntroyCalibrator() {
+        CHECK(cudaFree(deviceInput));
+        if (batchData)
+            delete[] batchData;
+    }
+
+    bool int8EntroyCalibrator::getBatch(void **bindings, const char **names, int nbBindings) {
+        cout << imageIndex << " " << batchSize << endl;
+        cout << imgPaths.size() << endl;
+        if (imageIndex + batchSize > int(imgPaths.size()))
+            return false;
+
+        float* ptr = batchData;
+        for (size_t j = imageIndex; j < imageIndex + batchSize; ++j)
+        {
+
+            cv::Mat img = cv::imread(imgPaths[j]);
+            std::vector<float>inputData = prepareImage(img);
+            cout << inputData.size() << endl;
+            cout << inputCount << endl;
+            if ((int)(inputData.size()) != inputCount)
+            {
+                return false;
+            }
+            assert(inputData.size() == inputCount);
+            int len = (int)(inputData.size());
+            memcpy(ptr, inputData.data(), len * sizeof(float));
+
+            ptr += inputData.size();
+            std::cout << "load image " << imgPaths[j] << "  " << (j + 1)*100. / imgPaths.size() << "%" << std::endl;
+        }
+        imageIndex += batchSize;
+        CHECK(cudaMemcpy(deviceInput, batchData, inputCount * sizeof(float), cudaMemcpyHostToDevice));
+        bindings[0] = deviceInput;
+        return true;
+    }
+    const void* int8EntroyCalibrator::readCalibrationCache(std::size_t &length)
+    {
+        calibrationCache.clear();
+        std::ifstream input(calibTablePath, std::ios::binary);
+        input >> std::noskipws;
+        if (readCache && input.good())
+            std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                std::back_inserter(calibrationCache));
+
+        length = calibrationCache.size();
+        return length ? &calibrationCache[0] : nullptr;
+    }
+
+    void int8EntroyCalibrator::writeCalibrationCache(const void *cache, std::size_t length)
+    {
+        std::ofstream output(calibTablePath, std::ios::binary);
+        output.write(reinterpret_cast<const char*>(cache), length);
+    }
+
+
+bool TensorRTWrapper::onnx2TRTModel(const std::string& onnxModelFile,const std::string TRTModelSavePath,const unsigned int workspace, unsigned int maxBatchSize, const int mode){
+
+    ImplTrtWrapper_->mEngine = nullptr;
+
+    cout << "Building TRT model " << endl;
+    ImplTrtWrapper_->mMaxBatchSize = maxBatchSize;
+    auto builder = SampleUniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(gLogger.getTRTLogger()));
+    if (!builder){
+        return false;
+    }
+
+    const auto explicitBatch = 1U << static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
+    auto network = SampleUniquePtr<nvinfer1::INetworkDefinition>(builder->createNetworkV2(explicitBatch));
+
+    if (!network){
+        return false;
+    }
+
+    auto config = SampleUniquePtr<nvinfer1::IBuilderConfig>(builder->createBuilderConfig());
+    if (!config){
+        return false;
+    }
+
+    auto parser = SampleUniquePtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger.getTRTLogger()));
+    if (!parser){
+        return false;
+    }
+    cout << "Parsing TRT model " << endl;
+    auto parsed = parser->parseFromFile(
+       onnxModelFile.c_str(), static_cast<int>(gLogger.getReportableSeverity()));
+    if (!parsed){
+        return false;
+    }
+
+    config->setAvgTimingIterations(1);
+    config->setMinTimingIterations(1);
+    config->setMaxWorkspaceSize(1 << 30);
+    config->setFlag(BuilderFlag::kDEBUG);
+
+    if (mode == 1) {
+        config->setFlag(BuilderFlag::kFP16);
+        std::cout<< "Run in FP16..." << std::endl;
+    }
+    if (mode == 2) {
+        config->setFlag(BuilderFlag::kINT8);
+
+        std::cout<< "Run in INT8..." << std::endl;
+    }
+
+    builder->setMaxBatchSize(maxBatchSize);
+
+    if (mode > 2 || mode < 0){
+        return false;
+    }
+
+    //  int8
+    if (mode == 2) {
+        
+        std::string inputBlob = "input.1";
+        std::string networkName = "PSENet";
+
+        std::string calibFile = "./calibList.txt";
+        int8EntroyCalibrator *calibrator = nullptr;
+        int BatchSize = 1;
+        calibrator = new int8EntroyCalibrator(pngBatchSize, calibFile, "./CalibrationTablePSENet");    
+        config->setInt8Calibrator(calibrator);    
+    }  
+
+    samplesCommon::enableDLA(builder.get(), config.get(), -1);
+
+    std::shared_ptr<nvinfer1::ICudaEngine> Engine = std::shared_ptr<nvinfer1::ICudaEngine>(
+        builder->buildEngineWithConfig(*network, *config), samplesCommon::InferDeleter());
+    if (!Engine){
+        return false;
+    }
+
+    cout << "Writing to " << TRTModelSavePath << "..." << endl;
+    auto serialized = Engine->serialize();
+    ofstream file(TRTModelSavePath, ios::out | ios::binary);
+    file.write(reinterpret_cast<const char*>(serialized->data()), serialized->size());
+    serialized->destroy();
+    cout << "Writed " << endl;
+
+    return true;
+}
+
+bool TensorRTWrapper::loadTRTModel(const std::string &TRTModelPath){
+
+    std::ifstream engineFile(TRTModelPath, ios::in | ios::binary);
+    if (!engineFile){
+        std::cout << "Error opening TRT engine file: " << std::endl;
+        return false;
+    }
+
+    engineFile.seekg(0, engineFile.end);
+    size_t fsize = engineFile.tellg();
+    engineFile.seekg(0, engineFile.beg);
+
+    char *buffer = new char[fsize];
+    engineFile.read(buffer, fsize);
+    if (!engineFile){
+        std::cout << "Error opening engine file: " << std::endl;
+        engineFile.close();
+        delete[] buffer;
+        return false;
+    }
+
+    std::cout<< "loading trt model..."<< std::endl;
+
+    engineFile.close();
+    auto runtime = SampleUniquePtr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(gLogger.getTRTLogger()));
+    ImplTrtWrapper_->mEngine = std::shared_ptr<nvinfer1::ICudaEngine>(
+        runtime->deserializeCudaEngine(buffer, fsize, nullptr),
+        samplesCommon::InferDeleter());
+    if (!ImplTrtWrapper_->mEngine){
+        delete[] buffer;
+        return false;
+    }
+    delete[] buffer;
+    return true;
+}
