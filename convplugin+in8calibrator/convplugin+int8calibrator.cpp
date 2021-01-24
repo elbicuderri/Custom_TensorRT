@@ -47,20 +47,20 @@
 #include <float.h>
 
 /*
-convolutionÀ» cuda kernel·Î ÀÛ¼ºÇÏ°í ÀÌ¸¦ tensorrt pluginV2Ext¸¦ »ç¿ëÇÏ¿©
-custom layer¸¦ implement ÇÑ ¿¬½ÀÀ» ÇÑ ÄÚµå´Ù.
+convolutionì„ cuda kernelë¡œ ì‘ì„±í•˜ê³  ì´ë¥¼ tensorrt pluginV2Extë¥¼ ì‚¬ìš©í•˜ì—¬
+custom layerë¥¼ implement í•œ ì—°ìŠµì„ í•œ ì½”ë“œë‹¤.
 
-2021³â 1¿ù 20ÀÏ ³î¶ó¿î »ç½ÇÀ» ¹ß°ßÇß´Âµ¥... 16bit dtype µ¹¾Æ°¡´Â kernelÀÌ ±¸Çö
-¾ÈµÇ¾îÀÖ´Âµ¥ 16ºñÆ®·Î engineÀÌ »ı¼ºµÇ¾ú´Ù. engine ÆÄÀÏ ÀúÀåÀº ¾ÈµÈ´Ù...
-8bit °æ¿ì¿¡´Â convpluginµµ tableÀÚÃ¼´Â »ı¼ºµÇÁö¸¸ weight¸¦ Á÷Á¢ ³Ö´Â ¹æ¹ıÀ» ±¸Çö
-ÇÏÁö ¸øÇß´Ù. calibrationtableÀ» ¾î¶»°Ô ÀĞ´ÂÁöµµ ¾ÆÁ÷ Àß ¸ğ¸£°Ú´Ù..
+ë†€ë¼ìš´ ì‚¬ì‹¤ì„ ë°œê²¬í–ˆëŠ”ë°.. 16bit dtype ëŒì•„ê°€ëŠ” kernelì´ êµ¬í˜„
+ì•ˆë˜ì–´ìˆëŠ”ë° 16ë¹„íŠ¸ë¡œ engineì´ ìƒì„±ë˜ì—ˆë‹¤. engine íŒŒì¼ ì €ì¥ì€ ì•ˆëœë‹¤...
+8bit ê²½ìš°ì—ëŠ” convpluginë„ tableìì²´ëŠ” ìƒì„±ë˜ì§€ë§Œ weightë¥¼ ì§ì ‘ ë„£ëŠ” ë°©ë²•ì„ êµ¬í˜„
+í•˜ì§€ ëª»í–ˆë‹¤. calibrationtableì„ ì–´ë–»ê²Œ ì½ëŠ”ì§€ë„ ì•„ì§ ì˜ ëª¨ë¥´ê² ë‹¤..
 
-ÀÛ¼ºÀÚ: ¹é½ÂÈ¯
-ÀÛ¼ºÀÏ: 2021³â 1¿ù 20ÀÏ
+ì‘ì„±ì: ë°±ìŠ¹í™˜
+
 */
 
 /*
-CUDAÇÔ¼ö error Ã¼Å© ÇÔ¼ö
+CUDAí•¨ìˆ˜ error ì²´í¬ í•¨ìˆ˜
 */
 #define CHECK(status)                                                                                                  \
     do                                                                                                                 \
@@ -78,7 +78,7 @@ void my_convolution_func(float* output, float* input, float *weight, float *bias
 	Dims dim_pad, Dims dim_stride, cudaStream_t stream);
 
 /*
-calibrator writeCalibrationCacheÇÔ¼ö¿¡¼­ ¾²ÀÌ´Â ÇÔ¼ö.
+calibrator writeCalibrationCacheí•¨ìˆ˜ì—ì„œ ì“°ì´ëŠ” í•¨ìˆ˜.
 */
 template<typename T> void write(char*& buffer, const T& val)
 {
@@ -90,7 +90,7 @@ template<typename T> void write(char*& buffer, const T& val)
 class ConvPluginV2 : public nvinfer1::IPluginV2Ext
 {
 /*
-class¿¡¼­ ¾²ÀÏ ¸â¹ö º¯¼ö Á¤ÀÇ.
+classì—ì„œ ì“°ì¼ ë©¤ë²„ ë³€ìˆ˜ ì •ì˜.
 */
 public:
 	DataType iType;
@@ -120,7 +120,7 @@ public:
 		, kH(kH)
 		, kW(kW)
 	{
-		h_weight.insert(h_weight.end(), &((float*)Weight.values)[0], &((float*)Weight.values)[oC*iC*kH*kW]); // Weights Å¸ÀÔÀ» Á÷Á¢ ÀÌ¿ëÇÑ ¹æ¹ı.
+		h_weight.insert(h_weight.end(), &((float*)Weight.values)[0], &((float*)Weight.values)[oC*iC*kH*kW]); // Weights íƒ€ì…ì„ ì§ì ‘ ì´ìš©í•œ ë°©ë²•.
 		h_bias.insert(h_bias.end(), &((float*)Bias.values)[0], &((float*)Bias.values)[oC]);
 	}
 
@@ -143,7 +143,7 @@ public:
 	size_t getWorkspaceSize(int maxBatchSize) const override { return 0; }
 
 	/*
-	cudastreamÀ» ÀÌ¿ëÇÑ cudamemcpyasync »ç¿ë°¡´É ±¸Çö.
+	cudastreamì„ ì´ìš©í•œ cudamemcpyasync ì‚¬ìš©ê°€ëŠ¥ êµ¬í˜„.
 	*/
 	int enqueue(int batchSize, const void* const* inputs,
 		void** outputs, void* workspace, cudaStream_t stream) override
@@ -797,7 +797,7 @@ int main()
 
 	//////========================================================================================================================
 	/*
-	ÀÌ ÄÚµå´Â ÇöÀç engineÀÌ ÀúÀåÀÌ ¾È µÇ°í ÀÖ´Ù. 
+	ì´ ì½”ë“œëŠ” í˜„ì¬ engineì´ ì €ì¥ì´ ì•ˆ ë˜ê³  ìˆë‹¤. 
 	*/
 
 	auto ModelEngine = mEngine->serialize();
