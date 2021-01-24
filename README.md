@@ -4,9 +4,9 @@ This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlu
 
 > MNIST
 >
-> Conv2D ( 5*5 kernel, zero padding, OutChannel = 5) : (1, 28, 28) -> (5, 24, 24)
+> Conv2D ( 5X5 kernel, zero padding, OutChannel = 5) : (1, 28, 28) -> (5, 24, 24)
 >
-> Maxpooling ( 2*2 kernel, zero padding, 2*2 stride) : (5, 24, 24) -> (5, 12, 12)
+> Maxpooling ( 2X2 kernel, zero padding, 2X2 stride) : (5, 24, 24) -> (5, 12, 12)
 >
 > FClayer1 : (5, 12, 12) -> (120,)
 >
