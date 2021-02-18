@@ -14,12 +14,12 @@ batch_size = 100
 
 transform = transforms.ToTensor()# 0 ~ 1
 
-train_dataset = datasets.MNIST('../mnist_data/',
+train_dataset = datasets.MNIST('C:\\data\\mnist_data/',
                                download=True,
                                train=True,
                                transform=transform) # image to Tensor # image, label
 
-test_dataset = datasets.MNIST("../mnist_data/",
+test_dataset = datasets.MNIST("C:\\data\\mnist_data/",
                               train=False,
                               download=True,
                               transform=transform)
@@ -155,7 +155,7 @@ for epoch in range(0, 10):
 def save_weights(weights, name):
     weights = weights.cpu().detach().numpy().astype(dtype)
     print(name, ": ", weights.shape)
-    weights.tofile(f"weights_torch/{name}_torch_{dtype}.wts")
+    weights.tofile(f"weights/{name}_torch_{dtype}.wts")
     # np.save(weights, f"weights_torch/{name}_torch_{dtype}.npy")
 
 parameters = list(model.parameters())
