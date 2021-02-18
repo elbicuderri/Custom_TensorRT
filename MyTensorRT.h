@@ -1,3 +1,8 @@
+/*
+This header file is just summary. (for yolo model later)
+not implemented.
+*/
+
 class NetworkRT {
 
 public:
