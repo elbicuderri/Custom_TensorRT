@@ -54,7 +54,7 @@ class Net(nn.Module):
         y = F.softmax(dense2, dim=1)
 
         if self.dump == 1:
-            conv1_arr = conv1.cpu().data.numpy().astype(dtype)
+            conv1_arr = conv1.cpu().detach().numpy().astype(dtype)
             print(conv1_arr.shape)
             conv1_arr.tofile(f"value/conv1_torch_{dtype}.bin")
             # np.save(conv1_arr, f"value/conv1_torch_{dtype}.npy")
@@ -62,7 +62,7 @@ class Net(nn.Module):
             # batchnorm_arr = batchnorm.cpu().data.numpy()
             # print(batchnorm_arr.shape)
             # batchnorm_arr.tofile("value/batchnorm_torch_{dtype}.bin")
-            maxpool_arr = maxpool.cpu().data.numpy().astype(dtype)
+            maxpool_arr = maxpool.cpu().detach().numpy().astype(dtype)
             print(maxpool_arr.shape)
             maxpool_arr.tofile(f"value/maxpool1_torch_{dtype}.bin")
             # np.save(maxpool_arr, f"value/maxpool1_torch_{dtype}.npy")
@@ -70,27 +70,27 @@ class Net(nn.Module):
             # relu_maxpool_arr = relu_maxpool.cpu().data.numpy()
             # print(relu_maxpool_arr.shape)
             # relu_maxpool_arr.tofile("value/relu_maxpool_torch_{dtype}.bin")
-            flatten_arr = flatten.cpu().data.numpy().astype(dtype)
+            flatten_arr = flatten.cpu().detach().numpy().astype(dtype)
             print(flatten_arr.shape)
             flatten_arr.tofile(f"value/flatten_torch_{dtype}.bin")
             # np.save(flatten_arr, f"value/flatten_torch_{dtype}.npy")
 
-            dense1_arr = dense1.cpu().data.numpy().astype(dtype)
+            dense1_arr = dense1.cpu().detach().numpy().astype(dtype)
             print(dense1_arr.shape)
             dense1_arr.tofile(f"value/dense1_torch_{dtype}.bin")
             # np.save(dense1_arr, f"value/dense1_torch_{dtype}.npy")
 
-            relu_dense1_arr = relu_dense1.cpu().data.numpy().astype(dtype)
+            relu_dense1_arr = relu_dense1.cpu().detach().numpy().astype(dtype)
             print(relu_dense1_arr.shape)
             relu_dense1_arr.tofile(f"value/relu_dense1_torch_{dtype}.bin")
             # np.save(relu_dense1_arr, f"value/relu_dense1_torch_{dtype}.npy")
 
-            dense2_arr = dense2.cpu().data.numpy().astype(dtype)
+            dense2_arr = dense2.cpu().detach().numpy().astype(dtype)
             print(dense2_arr.shape)
             dense2_arr.tofile(f"value/dense2_torch_{dtype}.bin")
             # np.save(dense2_arr, f"value/dense2_torch_{dtype}.npy")
 
-            result = y.cpu().data.numpy().astype(dtype)
+            result = y.cpu().detach().numpy().astype(dtype)
             print(result.shape)
             result.tofile(f"value/result_torch_{dtype}.bin")
             # np.save(result, f"weights_torch/result_torch_{dtype}.npy")
@@ -107,12 +107,15 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 def train(epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = Variable(data).to(device), Variable(target).to(device)
-        optimizer.zero_grad()
+        data, target = data.to(device), target.to(device)
+        
         output = model(data)
         loss = F.nll_loss(output, target)
+        
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
         if batch_idx % 100 == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -123,7 +126,7 @@ def test():
     test_loss = 0
     correct = 0
     for data, target in valid_loader:
-        data, target = Variable(data).to(device), Variable(target).to(device)
+        data, target = data.to(device), target.to(device)
         output = model(data)
         # sum up batch loss
         test_loss += F.nll_loss(output, target, reduction='sum').item()
@@ -184,7 +187,8 @@ def calculate():
     #     data, target = Variable(data).to(device), Variable(target).to(device)
     #     output = model(data)
     for data, target in test_loader:
-        data, target = Variable(data).to(device), Variable(target).to(device)
+        data, target = data.to(device), target.to(device)
+        
     model.dump = 1
     model.eval()
     output = model(data)
