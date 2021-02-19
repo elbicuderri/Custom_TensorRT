@@ -2,6 +2,8 @@
 
 This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlugin)
 
+You can get weight files from mnist_torch_tensorrt.py.
+
 > MNIST
 >
 > Conv2D ( 5X5 kernel, zero padding, OutChannel = 5) : (1, 28, 28) -> (5, 24, 24)
