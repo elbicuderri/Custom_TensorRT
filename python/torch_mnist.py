@@ -1,3 +1,6 @@
+"""
+This code is forked from https://github.com/elbicuderri/C_cuDNN_CUDA
+"""
 import torch
 import torch.nn as nn
 from torch.nn import Conv2d, BatchNorm2d, MaxPool2d, Linear
