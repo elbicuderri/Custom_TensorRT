@@ -2,7 +2,7 @@
 
 This is a code making custom convolution layer.(using CUDA kernel, TensorRT IPlugin)
 
-You can get weight files from mnist_torch_tensorrt.py.
+You can get weight files from **mnist_torch_tensorrt.py**.
 
 > MNIST
 >
