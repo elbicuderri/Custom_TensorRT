@@ -34,9 +34,7 @@
 
 /*
 Int8Calibrator를 TensorRT에서 쓰라는 방법대로 하려면 BatchStream이라는 class를 사용해야 한다.
-그러면 이 class에 맞춰서 type들을 맞춰줘야 하는데, 개인적으로 매우 피곤해서 내가 사용할 수 있게 
-MyInt8Calibrator class라는 새로 만들었다. 
-어떻게 돌아가게 만들었는지 설명하겠다.
+좀 더 편리하게 사용하기 위해 MyInt8Calibrator class라는 새로 만들었다. 
 작성자: 백승환
 */
 
