@@ -17,7 +17,22 @@ int main()
 	//int* a = (int*)malloc(size * sizeof(int));
 	//int* b = (int*)malloc(size * sizeof(int));
 	//int* c = (int*)malloc(size * sizeof(int));
+	
+	/*
+	int* a = (int*)std::malloc(size * sizeof(int));
+	int* b = (int*)std::malloc(size * sizeof(int));
+	int* c = (int*)std::malloc(size * sizeof(int));
 
+	if (a == nullptr) return -1;
+	if (b == nullptr) return -1;
+	if (c == nullptr) return -1;
+
+	int aa[5] = { 1, 2, 3, 4, 5 };
+	int bb[5] = { 10, 20, 30, 40, 50 };
+	a = aa;
+	b = bb;
+	*/
+	
 	for (int i = 0; i < 0; i++) {
 		std::cout << a[i] << std::endl;
 		//printf("%d\n", a[i]);
