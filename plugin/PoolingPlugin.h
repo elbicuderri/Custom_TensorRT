@@ -1,35 +1,4 @@
-#include <assert.h>
-#include <cmath>
-#include <cstdint>
-#include <cublas_v2.h>
-#include <cuda_runtime_api.h>
-#include <cudnn.h>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <string.h>
-#include <sys/stat.h>
-#include <time.h>
-#include <cassert>
-
-#include "NvCaffeParser.h"
-#include "NvInfer.h"
-#include "argsParser.h"
-#include "buffers.h"
-#include "common.h"
-#include "logger.h"
-
-#include "EntropyCalibrator.h"
-
-#include <cstdlib>
-#include <cstring>
-#include <time.h>
-#include <string>
-#include <algorithm>
-#include <vector>
-#include <limits.h>
-#include <float.h>
+#pragma once
 
 class PoolingPluginV2IO : public nvinfer1::IPluginV2IOExt
 {
@@ -74,10 +43,10 @@ public:
 	void serialize(void* buffer) const override;
 
 	void configurePlugin(
-        const PluginTensorDesc* in,
-        int nbInput,
-        const PluginTensorDesc* out,
-        int nbOutput) override;
+		const PluginTensorDesc* in,
+		int nbInput,
+		const PluginTensorDesc* out,
+		int nbOutput) override;
 
 
 	bool supportsFormatCombination(int32_t pos, const PluginTensorDesc *inOut,

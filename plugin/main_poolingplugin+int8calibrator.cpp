@@ -47,6 +47,8 @@
 #include <float.h>
 
 #include "utils.h"
+#include "MyInt8Calibrator.h"
+#include "PoolingPlugin.h"
 
 int main()
 {
@@ -60,6 +62,8 @@ int main()
 	int InputH = 28;
 	int InputW = 28;
 	int OutputSize = 10;
+
+	int calibration_number = 1000;
 
 	const char* InputName = "data";
 	const char* OutputName = "prob";
@@ -91,7 +95,33 @@ int main()
 	config->setAvgTimingIterations(1);
 	config->setMinTimingIterations(1);
 	config->setFlag(BuilderFlag::kGPU_FALLBACK);
+	config->setFlag(BuilderFlag::kSTRICT_TYPES);
 
+	//// FP16
+	//config->setFlag(BuilderFlag::kFP16);
+
+	//INT8
+	config->setFlag(BuilderFlag::kINT8);
+
+	auto calib_data = std::vector<float>(h_data.begin(),
+		h_data.begin() + (calibration_number * InputH * InputW));
+
+	const std::string CalibrationFile = "CalibrationTableSample";
+
+	std::unique_ptr<MyInt8Calibrator> int8_calibrator = std::make_unique<MyInt8Calibrator>(
+		calibration_number,
+		1,
+		InputC,
+		InputH,
+		InputW,
+		InputName,
+		CalibrationFile,
+		(float*)&calib_data[0],
+		true);
+
+	config->setInt8Calibrator(int8_calibrator.get());
+
+	//======================================================================================================
 	//======================================================================================================
 
 	nvinfer1::INetworkDefinition* network = builder->createNetwork();
@@ -151,20 +181,33 @@ int main()
 	//network->markOutput(*conv1->getOutput(0));
 	//////===================================================================================================
 	//////===================================================================================================
-	//////Add max pooling layer with stride of 2x2 and kernel size of 2x2.
-	IPoolingLayer* pool1 = network->addPoolingNd(*conv1->getOutput(0),
-		PoolingType::kMAX, Dims{ 2, {2, 2}, {} });
+	//////Add max pooling plugin layer with stride of 2x2 and kernel size of 2x2.
+	std::unique_ptr<IPluginV2Ext> MyPoolingPlugin = std::make_unique<PoolingPluginV2IO>(
+		conv1->getOutput(0),
+		BatchSize,
+		5, 24, 24,
+		2, 2, 0, 0, 2, 2);
+	
+	ITensor* const OutputOfConv = conv1->getOutput(0);
+	IPluginV2Layer* pool1 = network->addPluginV2(&OutputOfConv, 1, *MyPoolingPlugin);
 	assert(pool1);
-	pool1->setStride(DimsHW{ 2, 2 });
-	pool1->getOutput(0)->setName("maxpool1");
+	std::cout << "Pooling_Plugin_Layer made." << std::endl;
+	conv1->getOutput(0)->setName("maxpool1");
+	//////===================================================================================================
+	//////===================================================================================================
+	//////Add max pooling layer with stride of 2x2 and kernel size of 2x2.
+	//IPoolingLayer* pool1 = network->addPoolingNd(*conv1->getOutput(0),
+	//	PoolingType::kMAX, Dims{ 2, {2, 2}, {} });
+	//assert(pool1);
+	//pool1->setStride(DimsHW{ 2, 2 });
+	//pool1->getOutput(0)->setName("maxpool1");
 
 	//pool1->getOutput(0)->setName(output);
 	//network->markOutput(*pool1->getOutput(0));
 	//////===================================================================================================
 	//////===================================================================================================
 	//// Add fully connected layer with 120 outputs.
-	IFullyConnectedLayer* ip1
-		= network->addFullyConnected(*pool1->getOutput(0), 120, ip1filter, ip1bias);
+	IFullyConnectedLayer* ip1 = network->addFullyConnected(*pool1->getOutput(0), 120, ip1filter, ip1bias);
 	assert(ip1);
 	ip1->getOutput(0)->setName("dense1");
 
@@ -196,6 +239,23 @@ int main()
 
 	//////===================================================================================================
 	//////===================================================================================================
+	conv1->setPrecision(DataType::kINT8);
+	conv1->setOutputType(0, DataType::kINT8);
+
+	pool1->setOutputType(0, DataType::kINT8);
+	pool1->setPrecision(DataType::kINT8);
+
+	ip1->setPrecision(DataType::kINT8);
+	ip1->setOutputType(0, DataType::kINT8);
+
+	relu1->setPrecision(DataType::kINT8);
+	relu1->setOutputType(0, DataType::kINT8);
+
+	ip2->setPrecision(DataType::kINT8);
+	ip2->setOutputType(0, DataType::kINT8);
+
+	//////===================================================================================================
+	//////===================================================================================================
 
 	nvinfer1::ICudaEngine* mEngine = builder->buildEngineWithConfig(*network, *config);
 	if (!mEngine)
@@ -221,7 +281,7 @@ int main()
 
 	////========================================================================================================================
 	//// inference loop
-	int epochs = (Total + BatchSize - 1) / BatchSize;
+	int epochs = ((Total - calibration_number) + BatchSize - 1) / BatchSize;
 
 	int OutSize = OutputSize;
 
@@ -236,9 +296,9 @@ int main()
 
 		std::vector<float> h_batchdata;
 
-		auto start_index = h_data.begin() + (epoch * BatchSize * InputH * InputW);
+		auto start_index = h_data.begin() + ((epoch + calibration_number) * BatchSize * InputH * InputW);
 
-		auto end_index = h_data.begin() + (epoch * BatchSize * InputH * InputW + BatchSize * InputH * InputW);
+		auto end_index = h_data.begin() + ((epoch + calibration_number) * BatchSize * InputH * InputW + BatchSize * InputH * InputW);
 
 		h_batchdata = std::vector<float>(start_index, end_index);
 
@@ -288,8 +348,8 @@ int main()
 	auto label = load_data_vector<int>("C:\\Users\\muger\\Desktop\\data/mnist_test_labels_int32.bin");
 
 	int count = 0;
-	for (int i = 0; i < Total; i++) {
-		int answer = label[i];
+	for (int i = 0; i < Total - calibration_number; i++) {
+		int answer = label[i + calibration_number];
 		int MyAnswer;
 		float max = -10.0f;
 		for (int j = 0; j < OutputSize; j++)
@@ -300,8 +360,7 @@ int main()
 	}
 
 	std::cout << "The number of correct is " << count << std::endl;
-	std::cout << ((float)count / (float)(Total)) * 100.0f << "%" << std::endl;
-
+	std::cout << ((float)count / (float)(Total - calibration_number)) * 100.0f << "%" << std::endl;
 
 	//////========================================================================================================================
 	//////========================================================================================================================
@@ -322,8 +381,8 @@ int main()
 	}
 
 	ModelEngine->destroy();
-//////========================================================================================================================
-//////========================================================================================================================
+	//////========================================================================================================================
+	//////========================================================================================================================
 	std::cout << "Finished!\n" << std::endl;
 
 	clock_t end = clock();

@@ -72,9 +72,12 @@ __global__ void maxpool_plugin_kernel(float *output, float *input,
 }
 
 
-void maxpool_plugin(float *output, float *input,
+void maxpool_plugin_func(float *output, float *input,
 	int batch, int channel, int height, int width,
-	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream)
+	int kernel_height, int kernel_width,
+	int pad_height, int pad_width,
+	int stride_height, int stride_width,
+	cudaStream_t stream)
 {
 	int N = batch;
 	int C = channel;
@@ -101,7 +104,9 @@ void maxpool_plugin(float *output, float *input,
 
 __global__ void maxpool_plugin_int8_kernel(char* output, char* input,
 	int batch, int channel, int height, int width,
-	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, int total_size)
+	int kernel_height, int kernel_width,
+	int pad_height, int pad_width,
+	int stride_height, int stride_width, int total_size)
 {
 
 	int C = channel;
@@ -158,9 +163,12 @@ __global__ void maxpool_plugin_int8_kernel(char* output, char* input,
 }
 
 
-void maxpooling_plugin_int8(char* output, char* input,
+void maxpooling_plugin_int8_func(char* output, char* input,
 	int batch, int channel, int height, int width,
-	int kernel_height, int kernel_width, int pad_height, int pad_width, int stride_height, int stride_width, cudaStream_t stream)
+	int kernel_height, int kernel_width,
+	int pad_height, int pad_width,
+	int stride_height, int stride_width,
+	cudaStream_t stream)
 {
 	int N = batch;
 	int C = channel;

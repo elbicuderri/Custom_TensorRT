@@ -81,7 +81,7 @@ __global__ void conv_plugin_kernel(float *output, float *input, float *weight, f
 
 }
 
-void conv_plugin(float* output, float* input, float *weight, float *bias,
+void conv_plugin_func(float* output, float* input, float *weight, float *bias,
 	int batch, int out_channel, Dims dim_input, Dims dim_kernel,
 	Dims dim_pad, Dims dim_stride, cudaStream_t stream)
 {
@@ -118,7 +118,7 @@ void conv_plugin(float* output, float* input, float *weight, float *bias,
 	//std::cout << "THREADS_PER_BLOCK  is " << THREADS_PER_BLOCK << std::endl;
 	//std::cout << "NUMBER_OF_BLOCKS  is " << NUMBER_OF_BLOCKS << std::endl;
 
-	my_convolution_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK, 0, stream >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
+	conv_plugin_kernel << < NUMBER_OF_BLOCKS, THREADS_PER_BLOCK, 0, stream >> > ((float*)output, (float*)input, (float*)weight, (float*)bias,
 		N, C, K, H, W,
 		kH, kW, pH, pW, sH, sW, TOTAL_SIZE, stream);
 

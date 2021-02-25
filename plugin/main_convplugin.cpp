@@ -47,6 +47,7 @@
 #include <float.h>
 
 #include "utils.h"
+#include "ConvPlugin.h"
 
 int main()
 {
@@ -140,12 +141,28 @@ int main()
 
 	//////===================================================================================================
 	//////===================================================================================================
-	IConvolutionLayer* conv1 = network->addConvolutionNd(
-		*scale_1->getOutput(0), 5, Dims{ 2, {5, 5}, {} }, conv1filter, conv1bias);
+	std::unique_ptr<IPluginV2Ext> MyConvPlugin = std::make_unique<ConvPluginV2>(
+		scale_1->getOutput(0),
+		BatchSize,
+		5,
+		InputC,
+		InputH,
+		InputW, 5, 5, 0, 0, 1, 1, conv1filter, conv1bias);
+
+	ITensor* const OutputOfScale = scale_1->getOutput(0);
+	IPluginV2Layer* conv1 = network->addPluginV2(&OutputOfScale, 1, *MyConvPlugin);
 	assert(conv1);
-	conv1->setPadding(DimsHW{ 0, 0 });
-	conv1->setStride(DimsHW{ 1, 1 });
+	std::cout << "Conv_Plugin_Layer made." << std::endl;
 	conv1->getOutput(0)->setName("conv1");
+
+	//////===================================================================================================
+	//////===================================================================================================
+	//IConvolutionLayer* conv1 = network->addConvolutionNd(
+	//	*scale_1->getOutput(0), 5, Dims{ 2, {5, 5}, {} }, conv1filter, conv1bias);
+	//assert(conv1);
+	//conv1->setPadding(DimsHW{ 0, 0 });
+	//conv1->setStride(DimsHW{ 1, 1 });
+	//conv1->getOutput(0)->setName("conv1");
 
 	//conv1->getOutput(0)->setName(OutputName); //// if you want to see result of each layer, you have to set output to this layer.
 	//network->markOutput(*conv1->getOutput(0));
@@ -301,7 +318,6 @@ int main()
 
 	std::cout << "The number of correct is " << count << std::endl;
 	std::cout << ((float)count / (float)(Total)) * 100.0f << "%" << std::endl;
-
 
 	//////========================================================================================================================
 	//////========================================================================================================================
