@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 
-void addWithCuda(int* c, int* a, int* b, int size);
+void addWithCuda(int *c, int *a, int *b, int size);
 
 int main()
 {
@@ -19,20 +19,14 @@ int main()
 	int* b = (int*)std::malloc(size * sizeof(int));
 	int* c = (int*)std::malloc(size * sizeof(int));
 
-	if (a)
+	for (int i = 0; i < size; i++)
 	{
-		for (int i = 0; i < size; i++)
-		{
-			a[i] = i + 1;
-		}
+		a[i] = i + 1;
 	}
 
-	if (b)
+	for (int i = 0; i < size; i++)
 	{
-		for (int i = 0; i < size; i++)
-		{
-			b[i] = 10 * (i + 1);
-		}
+		b[i] = 10 * (i + 1);
 	}
 
 	int* d_a;
