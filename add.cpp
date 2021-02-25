@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 
-void addWithCuda(int *c, int *a, int *b, int size);
+void addWithCuda(int* c, int* a, int* b, int size);
 
 int main()
 {
